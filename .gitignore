@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# База данных и конфигурация
+*.db
+*.sqlite3
+.env
+
+# Логи
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
