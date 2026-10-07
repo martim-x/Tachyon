@@ -1,12 +1,3 @@
-from fastapi import FastAPI
+from app.interface.api.app import create_app
 
-app = FastAPI(
-    title="Tachyon",
-    description="Многопользовательский трекер доходов и расходов",
-    version="0.1.0",
-)
-
-
-@app.get("/health", tags=["Система"])
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+app = create_app()
