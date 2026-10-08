@@ -11,3 +11,7 @@ class NotFound(DomainError):
 
 class PermissionDenied(DomainError):
     """Действие запрещено: например, нет контекста пользователя."""
+
+
+class AuthenticationFailed(DomainError):
+    """Учётные данные или токен не прошли проверку."""
