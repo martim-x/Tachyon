@@ -84,6 +84,8 @@ class ScopedRepository(Generic[T]):
 
     async def update(self, pk: UUID, **fields: Any) -> T:
         """Чужая запись не найдётся, поэтому не изменится."""
+        if fields.keys() & {"id", "user_id"}:
+            raise TypeError("id и user_id нельзя менять через update")
         obj = await self.get_or_404(pk)
         for name, value in fields.items():
             setattr(obj, name, value)
