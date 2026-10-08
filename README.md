@@ -16,7 +16,7 @@
 
 ## Что здесь лежит
 
-Этот каталог — рабочая документация для команды. Кода проекта пока нет.
+Репозиторий содержит рабочую документацию и минимальный каркас FastAPI-приложения.
 
 | Файл | О чём |
 |---|---|
@@ -36,9 +36,42 @@
 Python, Flask/FastAPI, SQLAlchemy + SQLite, pandas для отчётов,
 APScheduler для повторяющихся операций, pytest для тестов.
 
+
+## Локальный запуск
+
+Требуется Python 3.11 или новее.
+
+### Windows PowerShell
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+python -m uvicorn app.main:app --reload
+```
+
+После запуска доступны:
+
+- health-check: <http://127.0.0.1:8000/health>;
+- Swagger: <http://127.0.0.1:8000/docs>;
+- ReDoc: <http://127.0.0.1:8000/redoc>.
+
+### Проверка
+
+```powershell
+python -m pytest
+python -m ruff check .
+```
+
+Файл `.env` содержит локальные настройки и секреты, поэтому не добавляется в Git.
+Шаблон допустимых переменных находится в `.env.example`.
+
+
+
 ## Команда
 
-5 человек, распределение ролей и зон ответственности — в
+6 человек, распределение ролей и зон ответственности — в
 `docs/04_команда_и_роли.md`.
 
 ## Связь
