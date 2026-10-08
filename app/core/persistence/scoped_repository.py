@@ -3,14 +3,16 @@
 Фильтр WHERE user_id = ... накладывается здесь и не может быть забыт в конкретном
 хендлере: конструктор не принимает user_id снаружи, идентификатор берётся из
 UserContext, session приватный, query-builder наружу не выдаётся. Пустой контекст
-это исключение, а не пустая выдача.
+это исключение, а не пустая выдача. Внешние ключи проверяются на владение
+(docs/03 §S3.2): ссылка обязана вести на строку того же пользователя, иначе
+NotFound - 404, а не 403.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, Table, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -75,18 +77,51 @@ class ScopedRepository(Generic[T]):
             raise NotFound(f"{self.model.__name__} не найден")
         return obj
 
+    def _fk_ownership_targets(self) -> dict[str, Table]:
+        """FK-поля модели, которые обязаны вести на строку текущего пользователя.
+
+        Цель без колонки user_id (users, справочные таблицы) не проверяется:
+        владение там подтверждает JWT, а не репозиторий. Цель ищется по
+        декларации FK в metadata, поэтому домену не нужен импорт чужой модели.
+        """
+        targets: dict[str, Table] = {}
+        for name, column in self.model.__table__.columns.items():
+            for fk in column.foreign_keys:
+                target = fk.column.table
+                if "user_id" in target.c:
+                    targets[name] = target
+        return targets
+
+    async def _assert_fk_ownership(self, values: Mapping[str, Any]) -> None:
+        """Ссылка по FK ведёт только на запись того же владельца (docs/03 §S3.2).
+
+        Чужая или несуществующая цель это NotFound: 404, а не 403, чтобы ответ
+        не подтверждал существование чужих строк.
+        """
+        user_id = self._user_id
+        for field, target in self._fk_ownership_targets().items():
+            value = values.get(field)
+            if value is None:
+                continue
+            stmt = select(exists().where(target.c.id == value, target.c.user_id == user_id))
+            result = await self._session.execute(stmt)
+            if not result.scalar_one():
+                raise NotFound(f"{field}: связанная запись не найдена")
+
     async def create(self, **fields: Any) -> T:
         """user_id всегда приходит из UserContext, а не из аргументов вызывающего."""
+        await self._assert_fk_ownership(fields)
         obj = self.model(user_id=self._user_id, **fields)
         self._session.add(obj)
         await self._session.flush()
         return obj
 
     async def update(self, pk: UUID, **fields: Any) -> T:
-        """Чужая запись не найдётся, поэтому не изменится."""
+        """Чужая запись не найдётся, поэтому не изменится; подменять id и user_id нельзя."""
         if fields.keys() & {"id", "user_id"}:
             raise TypeError("id и user_id нельзя менять через update")
         obj = await self.get_or_404(pk)
+        await self._assert_fk_ownership(fields)
         for name, value in fields.items():
             setattr(obj, name, value)
         await self._session.flush()

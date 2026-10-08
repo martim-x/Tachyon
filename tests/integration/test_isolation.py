@@ -1,7 +1,7 @@
 """Матрица изоляции на репозиториях (docs/03 §S2.4, docs/06 «Матрица изоляции»)."""
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import insert
@@ -36,6 +36,39 @@ CASES = [
         date(2026, 11, 1),
     ),
     (NotificationRepository, "notifications", factories.create_notification, "is_read", True),
+]
+
+# Поле FK, фабрика его цели (запись чужого владельца) и остальные поля модели
+FK_CASES = [
+    (
+        OperationRepository,
+        "category_id",
+        factories.create_category,
+        {"amount_cents": 1000, "kind": "expense"},
+    ),
+    (
+        BudgetRepository,
+        "category_id",
+        factories.create_category,
+        {"month": date(2026, 10, 1), "limit_amount_cents": 5000},
+    ),
+    (
+        RecurringRuleRepository,
+        "category_id",
+        factories.create_category,
+        {
+            "kind": "monthly",
+            "amount_cents": 1500,
+            "start_date": date(2026, 10, 1),
+            "next_run_at": datetime(2026, 10, 1, tzinfo=UTC),
+        },
+    ),
+    (
+        RecurringExecutionRepository,
+        "rule_id",
+        factories.create_recurring_rule,
+        {"period_date": date(2026, 10, 1)},
+    ),
 ]
 
 
@@ -95,6 +128,40 @@ async def test_isolation_repository_without_context_raises(session, repo_cls) ->
         await repo.update(pk, name="x")
     with pytest.raises(PermissionDenied):
         await repo.delete(pk)
+
+
+@pytest.mark.parametrize(
+    ("repo_cls", "fk_field", "target_seeder", "extra"),
+    FK_CASES,
+    ids=[
+        "operations-category",
+        "budget-limit-category",
+        "recurring-rule-category",
+        "recurring-execution-rule",
+    ],
+)
+async def test_isolation_foreign_fk_reference_rejected(
+    session, repo_cls, fk_field, target_seeder, extra
+) -> None:
+    """Ссылка на чужую или несуществующую строку по FK даёт 404 (docs/03 §S3.2)."""
+    alice = await factories.create_user(session, "alice@test.io")
+    bob = await factories.create_user(session, "bob@test.io")
+    foreign_target = await target_seeder(session, alice.id)
+    own_target = await target_seeder(session, bob.id)
+
+    with user_scope(bob.id):
+        repo = repo_cls(session)
+        with pytest.raises(NotFound):
+            await repo.create(**{fk_field: foreign_target.id, **extra})
+        with pytest.raises(NotFound):
+            await repo.create(**{fk_field: uuid.uuid4(), **extra})
+
+        own_row = await repo.create(**{fk_field: own_target.id, **extra})
+        with pytest.raises(NotFound):
+            await repo.update(own_row.id, **{fk_field: foreign_target.id})
+
+        untouched = await repo.get_by_id(own_row.id)
+        assert getattr(untouched, fk_field) == own_target.id
 
 
 async def test_isolation_same_category_name_for_different_users(session) -> None:
