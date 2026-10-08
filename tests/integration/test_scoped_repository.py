@@ -1,5 +1,7 @@
 """Контракт ScopedRepository: user_id только из контекста, подмена невозможна."""
 
+import uuid
+
 import pytest
 
 from app.core.persistence.scoped_repository import ScopedRepository
@@ -48,3 +50,22 @@ async def test_update_and_delete_work_for_owner(session) -> None:
         deleted = await repo.delete(category.id)
         assert deleted.id == category.id
         assert await repo.list() == []
+
+
+async def test_isolation_update_rejects_user_id_and_id_substitution(session) -> None:
+    """Замечание ревью к EP-02: update не двигает запись между пользователями."""
+    alice = await factories.create_user(session, "alice@test.io")
+    bob = await factories.create_user(session, "bob@test.io")
+
+    with user_scope(bob.id):
+        repo = CategoryRepository(session)
+        category = await repo.create(name="Продукты", kind="income")
+
+        with pytest.raises(TypeError, match="нельзя менять"):
+            await repo.update(category.id, user_id=alice.id)
+        with pytest.raises(TypeError, match="нельзя менять"):
+            await repo.update(category.id, id=uuid.uuid4())
+
+        reloaded = await repo.get_by_id(category.id)
+        assert reloaded is not None
+        assert reloaded.user_id == bob.id
