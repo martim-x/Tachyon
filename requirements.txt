@@ -13,6 +13,8 @@ anyio==4.15.1
     #   httpx
     #   starlette
     #   watchfiles
+bcrypt==5.0.0
+    # via tachyon (pyproject.toml)
 certifi==2026.7.22
     # via
     #   httpcore
@@ -63,6 +65,8 @@ pydantic-settings==2.15.0
     # via tachyon (pyproject.toml)
 pygments==2.21.0
     # via pytest
+pyjwt==2.15.1
+    # via tachyon (pyproject.toml)
 pytest==8.4.2
     # via
     #   tachyon (pyproject.toml)
