@@ -46,6 +46,8 @@ class RecentWindowPace:
 
     Окно ограничено days_elapsed, чтобы в первый день не растягивать
     однодневную сумму на семь (docs/06, пояснение к pace == "RECENT_WINDOW").
+    Месяц, который ещё не начался, темпа не даёт: при days_elapsed = 0 темп
+    нулевой по контракту модуля, независимо от суммы окна.
     """
 
     name = "RECENT_WINDOW"
@@ -57,9 +59,9 @@ class RecentWindowPace:
         days_elapsed: int,
         recent_window_total: Decimal,
     ) -> Decimal:
-        window_days = min(RECENT_WINDOW_DAYS, max(days_elapsed, 1))
-        if window_days == 0:
+        if days_elapsed == 0:
             return Decimal("0.00")
+        window_days = min(RECENT_WINDOW_DAYS, days_elapsed)
         return recent_window_total / window_days
 
 

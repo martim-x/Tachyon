@@ -18,8 +18,12 @@ def days_elapsed(year: int, month: int, as_of: date) -> int:
 
     Месяц ещё не начался - ноль прошедших дней, делить не на что
     (решение 8: сравнение с началом месяца, а не взятие as_of.day).
+    Месяц уже закрыт (as_of в одном из следующих месяцев) - полная длина:
+    месяц завершён, projected равен тратам (docs/03 §S6.1).
     Внутри месяца - as_of.day, отсечённый длиной месяца.
     """
     if as_of < date(year, month, 1):
         return 0
+    if (as_of.year, as_of.month) > (year, month):
+        return days_in_month(year, month)
     return min(as_of.day, days_in_month(year, month))

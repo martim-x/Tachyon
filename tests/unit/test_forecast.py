@@ -41,10 +41,47 @@ def test_ac3_first_day_without_data() -> None:
 
 
 def test_ac4_completed_month_equals_spent() -> None:
-    """AC4 Последний день месяца: days_remaining=0, projected = spent 1240.50."""
-    result = forecast_month(Decimal("1240.50"), 2026, 10, date(2026, 10, 31))
-    assert result["days_remaining"] == 0
-    assert result["projected_total"] == Decimal("1240.50")
+    """AC4 Последний день месяца: days_remaining=0, projected = spent 1240.50.
+
+    Месяц закрыт и для as_of позже его конца (2026-11-05): days_elapsed =
+    полная длина месяца, результат совпадает с последним днём (docs/03 §S6.1:
+    месяц завершён -> projected равен тратам).
+    """
+    last_day = forecast_month(Decimal("1240.50"), 2026, 10, date(2026, 10, 31))
+    assert last_day["days_remaining"] == 0
+    assert last_day["projected_total"] == Decimal("1240.50")
+
+    after_month = forecast_month(Decimal("1240.50"), 2026, 10, date(2026, 11, 5))
+    assert after_month["days_elapsed"] == 31
+    assert after_month["low_confidence"] is False
+    assert after_month == last_day
+
+
+def test_forecast_days_elapsed_closed_month() -> None:
+    """as_of в следующем месяце не должен подставлять день чужого месяца.
+
+    docs/06, кейс «отчёт за прошлый месяц при запросе сегодня»:
+    отчёт за 2026-09 при as_of=2026-10-05 даёт days_elapsed=30, а не 5.
+    """
+    assert calendar_math.days_elapsed(2026, 9, date(2026, 10, 5)) == 30
+
+
+def test_forecast_recent_window_zero_days_returns_zero_pace() -> None:
+    """RECENT_WINDOW при days_elapsed=0: темп нулевой, даже если окно ненулевое.
+
+    Контракт модуля «days_elapsed = 0 -> темп 0» действует и для свежего
+    окна: future-месяц не должен получать темп из суммы, присланной окном.
+    """
+    result = forecast_month(
+        Decimal("0.00"),
+        2026,
+        10,
+        date(2026, 9, 30),
+        pace=RECENT_WINDOW,
+        recent_window_total=Decimal("100.00"),
+    )
+    assert result["daily_rate"] == Decimal("0.00")
+    assert result["projected_total"] == Decimal("0.00")
 
 
 @pytest.mark.parametrize(
