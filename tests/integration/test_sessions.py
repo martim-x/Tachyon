@@ -36,3 +36,22 @@ async def test_exception_rolls_back_transaction(tmp_path) -> None:
         assert result.scalar_one() == 0
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_successful_transaction_is_committed(tmp_path) -> None:
+    database_path = tmp_path / "commit.db"
+    engine = create_async_engine(f"sqlite+aiosqlite:///{database_path.as_posix()}")
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as connection:
+        await connection.execute(text("CREATE TABLE example (id INTEGER PRIMARY KEY)"))
+
+    async with session_scope(factory) as session:
+        await session.execute(text("INSERT INTO example DEFAULT VALUES"))
+
+    async with factory() as session:
+        result = await session.execute(text("SELECT COUNT(*) FROM example"))
+        assert result.scalar_one() == 1
+
+    await engine.dispose()
