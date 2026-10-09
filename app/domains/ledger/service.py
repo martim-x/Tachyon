@@ -1,6 +1,7 @@
 """Бизнес-слой операций: изоляция даёт ScopedRepository, деньги - Money."""
 
 from collections.abc import Sequence
+from datetime import UTC
 from typing import Any
 from uuid import UUID
 
@@ -14,8 +15,6 @@ from app.domains.ledger.schemas import (
     OperationListQuery,
     OperationUpdate,
 )
-
-_NOT_NULL_FIELDS = ("category_id", "kind", "occurred_at")
 
 
 class OperationService:
@@ -31,7 +30,7 @@ class OperationService:
             "note": payload.note,
         }
         if payload.occurred_at is not None:
-            fields["occurred_at"] = payload.occurred_at
+            fields["occurred_at"] = payload.occurred_at.astimezone(UTC)
         return await self._operations.create(amount=Money(payload.amount), **fields)
 
     async def list_page(self, query: OperationListQuery) -> tuple[Sequence[Operation], int]:
@@ -50,6 +49,8 @@ class OperationService:
     async def update(self, operation_id: UUID, payload: OperationUpdate) -> Operation:
         fields = payload.model_dump(exclude_unset=True)
         amount = fields.pop("amount", None)
+        if fields.get("occurred_at") is not None:
+            fields["occurred_at"] = fields["occurred_at"].astimezone(UTC)
         return await self._operations.update(
             operation_id,
             amount=Money(amount) if amount is not None else None,

@@ -53,7 +53,10 @@ class Money:
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Money):
             return self._amount == other._amount
-        if isinstance(other, _ALLOWED):
+        # Строки в сравнении не участвуют: Decimal("abc") бросает InvalidOperation,
+        # а hash(Decimal) не совпадает с hash(str) - иначе ломается контракт eq/hash
+        # для смешанных dict и set (docs/02 §Правила денег).
+        if isinstance(other, (Decimal, int)):
             return self._amount == Decimal(other)
         return NotImplemented
 

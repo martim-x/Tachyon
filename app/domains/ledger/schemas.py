@@ -1,13 +1,21 @@
-"""Схемы операций и категорий (docs/02: OperationCreate, OperationDTO, CategoryDTO)."""
+"""Схемы операций и категорий (docs/02: OperationCreate, OperationDTO, CategoryDTO).
+
+amount ограничен 9 999 999.99: в БД копейки хранятся в 32-битном Integer
+(максимум 2 147 483 647), диапазон схемы выровнен под колонку, чтобы валидное
+по API значение не падало на вставке с 500 (docs/02 §«Правила денег»).
+occurred_at принимает только метки с таймзоной; не-UTC смещения сервис
+нормализует в UTC перед записью.
+"""
 
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 MAX_NOTE_LENGTH = 500
+MAX_AMOUNT = Field(max_digits=9, decimal_places=2, gt=0)
 
 Kind = Literal["income", "expense"]
 
@@ -16,9 +24,9 @@ class OperationCreate(BaseModel):
     """Тело POST /operations: user_id и source клиенту не принадлежат."""
 
     category_id: UUID
-    amount: Decimal = Field(max_digits=12, decimal_places=2, gt=0)
+    amount: Decimal = MAX_AMOUNT
     kind: Kind
-    occurred_at: datetime | None = None
+    occurred_at: AwareDatetime | None = None
     note: str | None = Field(default=None, max_length=MAX_NOTE_LENGTH)
 
 
@@ -26,16 +34,16 @@ class OperationUpdate(BaseModel):
     """Тело PATCH /operations/{id}: меняются только переданные поля."""
 
     category_id: UUID | None = None
-    amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2, gt=0)
+    amount: Decimal | None = Field(default=None, max_digits=9, decimal_places=2, gt=0)
     kind: Kind | None = None
-    occurred_at: datetime | None = None
+    occurred_at: AwareDatetime | None = None
     note: str | None = Field(default=None, max_length=MAX_NOTE_LENGTH)
 
     @model_validator(mode="after")
     def _not_null_columns_stay_not_null(self) -> "OperationUpdate":
         forbidden = {
             name
-            for name in ("category_id", "kind", "occurred_at")
+            for name in ("category_id", "amount", "kind", "occurred_at")
             if name in self.model_fields_set and getattr(self, name) is None
         }
         if forbidden:

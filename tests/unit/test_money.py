@@ -41,8 +41,13 @@ def test_money_addition_and_subtraction_stay_quantized() -> None:
     assert Money("10.00") - Money("25.50") == Money("-15.50")
 
 
-def test_money_compares_with_decimal_string_and_int() -> None:
+def test_money_compares_with_decimal_and_int_only() -> None:
+    """Сравнение согласовано с hash и не бросает исключений на посторонних типах."""
     assert Money("25.50") == Decimal("25.5")
-    assert Money("25.50") == "25.50"
+    assert Money("10.00") == 10
     assert Money("25.50") != 26
-    assert Money("25.50") != "25.51"
+    # строки и прочие типы дают False, а не InvalidOperation
+    assert Money("25.50") != "25.50"
+    assert Money("1.00") != "abc"
+    # контракт hash/eq для смешанных dict и set
+    assert hash(Money("25.50")) == hash(Decimal("25.50"))

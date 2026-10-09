@@ -371,7 +371,72 @@ async def test_operations_patch_rejects_null_for_not_null_fields(client, db) -> 
     assert response.status_code == 422
 
 
+async def test_operations_patch_rejects_null_amount(client, db) -> None:
+    """PATCH {"amount": null} -> 422: amount_cents тоже NOT NULL, тихий no-op недопустим."""
+    alice_id, alice_token = await register_and_login(client)
+    category = await seed_category(db, alice_id)
+    created = await create_operation(client, alice_token, category.id)
+
+    response = await client.patch(
+        f"/api/v1/operations/{created['id']}",
+        json={"amount": None},
+        headers=bearer(alice_token),
+    )
+
+    assert response.status_code == 422
+
+
+async def test_operations_reject_naive_occurred_at(client, db) -> None:
+    """occurred_at без таймзоны -> 422: в БД метки с таймзоной, naive даёт 500 на PG."""
+    alice_id, alice_token = await register_and_login(client)
+    category = await seed_category(db, alice_id)
+
+    response = await client.post(
+        "/api/v1/operations",
+        json={
+            "category_id": str(category.id),
+            "amount": "25.50",
+            "kind": "expense",
+            "occurred_at": "2026-10-05T10:00:00",
+        },
+        headers=bearer(alice_token),
+    )
+
+    assert response.status_code == 422
+
+
+async def test_operations_normalize_occurred_at_offset_to_utc(client, db) -> None:
+    """Не-UTC смещение валидно, но хранится и возвращается в UTC (+03:00 -> 10:00 UTC)."""
+    alice_id, alice_token = await register_and_login(client)
+    category = await seed_category(db, alice_id)
+
+    created = await create_operation(
+        client, alice_token, category.id, occurred_at="2026-10-05T13:00:00+03:00"
+    )
+
+    assert created["occurred_at"].startswith("2026-10-05T10:00:00")
+
+
+async def test_operations_reject_amount_over_integer_cents(client, db) -> None:
+    """10 000 000.00 -> 422: схема выровнена под int32 копеек, а не падает на вставке."""
+    alice_id, alice_token = await register_and_login(client)
+    category = await seed_category(db, alice_id)
+
+    response = await client.post(
+        "/api/v1/operations",
+        json={
+            "category_id": str(category.id),
+            "amount": "10000000.00",
+            "kind": "expense",
+        },
+        headers=bearer(alice_token),
+    )
+
+    assert response.status_code == 422
+
+
 async def test_operations_patch_foreign_returns_404_isolation(client, db) -> None:
+    """PATCH чужой операции -> 404; данные владельца не меняются."""
     alice_id, alice_token = await register_and_login(client, "alice@test.io")
     _, bob_token = await register_and_login(client, "bob@test.io")
     category = await seed_category(db, alice_id)
