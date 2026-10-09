@@ -1,8 +1,10 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import Conflict
 from app.domains.identity.models import User
 
 
@@ -24,7 +26,16 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     async def create(self, *, email: str, password_hash: str) -> User:
-        user = User(email=email.lower(), password_hash=password_hash)
+        user = User(
+            email=email.lower(),
+            password_hash=password_hash,
+        )
         self._session.add(user)
-        await self._session.flush()
+
+        try:
+            await self._session.flush()
+        except IntegrityError as error:
+            await self._session.rollback()
+            raise Conflict("Email уже занят") from error
+
         return user

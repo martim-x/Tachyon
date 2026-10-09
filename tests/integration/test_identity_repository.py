@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.errors import Conflict
 from app.domains.identity.repository import UserRepository
 
 
@@ -26,3 +27,22 @@ async def test_user_repository_returns_none_for_unknown_user(session) -> None:
 
     assert await repository.get_by_email("missing@example.com") is None
     assert await repository.get_by_id(uuid4()) is None
+
+
+@pytest.mark.asyncio
+async def test_user_repository_maps_duplicate_email_to_conflict(session) -> None:
+    repository = UserRepository(session)
+
+    await repository.create(
+        email="user@example.com",
+        password_hash="first-hash",
+    )
+    await session.commit()
+
+    with pytest.raises(Conflict):
+        await repository.create(
+            email="user@example.com",
+            password_hash="second-hash",
+        )
+
+    assert await repository.get_by_email("user@example.com") is not None

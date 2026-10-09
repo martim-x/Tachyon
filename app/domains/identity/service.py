@@ -3,6 +3,7 @@ from uuid import UUID
 
 import bcrypt
 import jwt
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.errors import AuthenticationFailed, Conflict
@@ -15,6 +16,9 @@ JWT_ALGORITHM = "HS256"
 def hash_password(password: str) -> str:
     password_bytes = password.encode("utf-8")
     return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
+
+
+DUMMY_PASSWORD_HASH = hash_password("dummy-password")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -82,16 +86,25 @@ class IdentityService:
         if await self._repository.get_by_email(normalized_email) is not None:
             raise Conflict("Email уже занят")
 
+        password_hash = await run_in_threadpool(hash_password, password)
+
         return await self._repository.create(
             email=normalized_email,
-            password_hash=hash_password(password),
+            password_hash=password_hash,
         )
 
     async def authenticate(self, *, email: str, password: str) -> User:
         user = await self._repository.get_by_email(email.lower())
+        password_hash = user.password_hash if user is not None else DUMMY_PASSWORD_HASH
 
-        if user is None or not verify_password(password, user.password_hash):
-            # Одинаковая ошибка не раскрывает, существует ли указанный email.
+        password_is_valid = await run_in_threadpool(
+            verify_password,
+            password,
+            password_hash,
+        )
+
+        if user is None or not password_is_valid:
+            # Одинаковые ответ и стоимость bcrypt не раскрывают существование email.
             raise AuthenticationFailed("Неверный email или пароль")
 
         return user

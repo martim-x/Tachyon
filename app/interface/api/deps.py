@@ -12,7 +12,10 @@ from app.domains.identity.models import User
 from app.domains.identity.repository import UserRepository
 from app.domains.identity.service import decode_access_token
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionDep = Annotated[
+    AsyncSession,
+    Depends(get_session, scope="function"),
+]
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -40,4 +43,7 @@ async def get_current_user(
         reset_current_user(context_token)
 
 
-CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentUser = Annotated[
+    User,
+    Depends(get_current_user, scope="function"),
+]
