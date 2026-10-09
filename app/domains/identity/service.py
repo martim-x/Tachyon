@@ -5,7 +5,9 @@ import bcrypt
 import jwt
 
 from app.core.config import get_settings
-from app.core.errors import AuthenticationFailed
+from app.core.errors import AuthenticationFailed, Conflict
+from app.domains.identity.models import User
+from app.domains.identity.repository import UserRepository
 
 JWT_ALGORITHM = "HS256"
 
@@ -66,3 +68,30 @@ def decode_access_token(
         return UUID(payload["sub"])
     except (jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
         raise AuthenticationFailed("Недействительный токен") from error
+
+
+class IdentityService:
+    """Сценарии регистрации и проверки учётных данных."""
+
+    def __init__(self, repository: UserRepository) -> None:
+        self._repository = repository
+
+    async def register(self, *, email: str, password: str) -> User:
+        normalized_email = email.lower()
+
+        if await self._repository.get_by_email(normalized_email) is not None:
+            raise Conflict("Email уже занят")
+
+        return await self._repository.create(
+            email=normalized_email,
+            password_hash=hash_password(password),
+        )
+
+    async def authenticate(self, *, email: str, password: str) -> User:
+        user = await self._repository.get_by_email(email.lower())
+
+        if user is None or not verify_password(password, user.password_hash):
+            # Одинаковая ошибка не раскрывает, существует ли указанный email.
+            raise AuthenticationFailed("Неверный email или пароль")
+
+        return user
