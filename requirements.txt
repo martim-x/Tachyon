@@ -13,6 +13,8 @@ anyio==4.15.1
     #   httpx
     #   starlette
     #   watchfiles
+bcrypt==5.0.0
+    # via tachyon (pyproject.toml)
 certifi==2026.7.22
     # via
     #   httpcore
@@ -21,6 +23,10 @@ click==8.5.0
     # via uvicorn
 colorama==0.4.6
     # via pytest
+dnspython==2.9.0
+    # via email-validator
+email-validator==2.3.0
+    # via tachyon (pyproject.toml)
 fastapi==0.142.2
     # via tachyon (pyproject.toml)
 greenlet==3.5.6
@@ -40,6 +46,7 @@ httpx==0.28.1
 idna==3.20
     # via
     #   anyio
+    #   email-validator
     #   httpx
 iniconfig==2.3.1
     # via pytest
@@ -63,6 +70,8 @@ pydantic-settings==2.15.0
     # via tachyon (pyproject.toml)
 pygments==2.21.0
     # via pytest
+pyjwt==2.15.1
+    # via tachyon (pyproject.toml)
 pytest==8.4.2
     # via
     #   tachyon (pyproject.toml)
