@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.core.logging import configure_logging
+from app.domains.identity.api import router as identity_router
 from app.interface.api.exception_handlers import (
     error_body,
     register_exception_handlers,
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     register_exception_handlers(application)
+    application.include_router(identity_router)
 
     @application.get("/health", tags=["Система"])
     async def health() -> dict[str, str]:

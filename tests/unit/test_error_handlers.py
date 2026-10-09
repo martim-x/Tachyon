@@ -5,10 +5,17 @@ import json
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
-from app.core.errors import NotFound, PermissionDenied
+from app.core.errors import (
+    AuthenticationFailed,
+    Conflict,
+    NotFound,
+    PermissionDenied,
+)
 from app.core.user_context import get_current_user
 from app.interface.api.app import create_app
 from app.interface.api.exception_handlers import (
+    authentication_failed_handler,
+    conflict_handler,
     error_body,
     not_found_handler,
     permission_denied_handler,
@@ -57,3 +64,21 @@ def test_permission_denied_returns_404_over_http() -> None:
 
     assert response.status_code == 404
     assert response.json() == NOT_FOUND_BODY
+
+
+async def test_authentication_failed_handler_returns_401() -> None:
+    response = await authentication_failed_handler(
+        None,
+        AuthenticationFailed("неверный токен"),
+    )
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert json.loads(response.body)["error"]["code"] == "UNAUTHORIZED"
+
+
+async def test_conflict_handler_returns_409() -> None:
+    response = await conflict_handler(None, Conflict("email занят"))
+
+    assert response.status_code == 409
+    assert json.loads(response.body)["error"]["code"] == "CONFLICT"
