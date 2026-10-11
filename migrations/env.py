@@ -17,7 +17,9 @@ from app.domains.scheduling import models as scheduling_models
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: миграции накатываются и внутри pytest
+    # (session-фикстура шаблона БД) - не глушим уже созданные логгеры.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 _MODEL_MODULES = (
     budget_models,
@@ -27,7 +29,10 @@ _MODEL_MODULES = (
     scheduling_models,
 )
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# URL может быть задан вызывающим кодом (тесты накатывают миграции на свою
+# БД); пустое значение означает рабочую БД из настроек.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 

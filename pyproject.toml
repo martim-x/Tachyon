@@ -32,10 +32,13 @@ dev = [
 include = ["app*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-q"
+markers = [
+    "e2e: сквозной сценарий из tests/e2e (запускается отдельной командой)",
+]
 
 [tool.ruff]
 line-length = 100
