@@ -17,7 +17,9 @@ from app.domains.scheduling import models as scheduling_models
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: миграции накатываются и внутри pytest
+    # (session-фикстура шаблона БД) - не глушим уже созданные логгеры.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 _MODEL_MODULES = (
     budget_models,

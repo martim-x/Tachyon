@@ -1,6 +1,6 @@
 """Каркас тестов: изоляция БД, фабрики и клиенты (docs/06 §Фикстуры)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -79,6 +79,17 @@ async def test_factories_objects_belong_to_their_user(
 
     assert {category.user_id, operation.user_id, limit.user_id, rule.user_id} == {alice.id}
     assert alice.id != bob.id
+
+
+async def test_rule_factory_next_run_follows_start_date(
+    user_factory: UserFactory,
+    rule_factory: RuleFactory,
+) -> None:
+    """next_run_at выводится из start_date: правило не просрочено до своего старта."""
+    alice, _ = await user_factory("alice@test.io")
+    rule = await rule_factory(alice, start_date=date(2026, 12, 1))
+
+    assert rule.next_run_at == datetime(2026, 12, 1, tzinfo=UTC)
 
 
 async def test_api_clients_are_two_different_users(

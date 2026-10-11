@@ -46,7 +46,6 @@ DEFAULT_OPERATION_AMOUNT = Decimal("10.00")
 DEFAULT_LIMIT_AMOUNT = Decimal("5000.00")
 DEFAULT_RULE_AMOUNT = Decimal("1500.00")
 DEFAULT_MONTH = date(2026, 10, 1)
-DEFAULT_NEXT_RUN = datetime(2026, 10, 1, tzinfo=UTC)
 FROZEN_TODAY = date(2026, 10, 15)
 
 
@@ -231,7 +230,7 @@ class LimitFactory:
 
 
 class RuleFactory:
-    """Правило повторов пользователя; по умолчанию monthly с 2026-10-01."""
+    """Правило повторов пользователя; next_run_at выводится из start_date."""
 
     def __init__(
         self,
@@ -261,7 +260,9 @@ class RuleFactory:
                 kind=kind,
                 amount_cents=Money(amount).to_cents(),
                 start_date=start_date,
-                next_run_at=DEFAULT_NEXT_RUN,
+                next_run_at=datetime(
+                    start_date.year, start_date.month, start_date.day, tzinfo=UTC
+                ),
             )
             session.add(rule)
             await session.commit()
