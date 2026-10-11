@@ -27,7 +27,10 @@ _MODEL_MODULES = (
     scheduling_models,
 )
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# URL может быть задан вызывающим кодом (тесты накатывают миграции на свою
+# БД); пустое значение означает рабочую БД из настроек.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 
