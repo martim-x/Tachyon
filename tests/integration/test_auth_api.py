@@ -1,45 +1,15 @@
-from collections.abc import AsyncIterator
+"""API аутентификации: регистрация, логин, 401 без токена (docs/03 §S2)."""
+
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import jwt
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from httpx import AsyncClient
 
 from app.core.config import get_settings
-from app.core.persistence import Base, get_session, session_scope
 from app.domains.identity.service import create_access_token
-from app.interface.api.app import create_app
-
-
-@pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[AsyncClient]:
-    database_path = tmp_path / "auth.db"
-    engine = create_async_engine(
-        f"sqlite+aiosqlite:///{database_path.as_posix()}",
-    )
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-
-    async def override_get_session() -> AsyncIterator[AsyncSession]:
-        async with session_scope(factory) as session:
-            yield session
-
-    application = create_app()
-    application.dependency_overrides[get_session] = override_get_session
-
-    transport = ASGITransport(app=application)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-    ) as test_client:
-        yield test_client
-
-    await engine.dispose()
+from tests.conftest import ApiClientFactory
 
 
 async def register_user(client: AsyncClient) -> dict:
@@ -54,16 +24,15 @@ async def register_user(client: AsyncClient) -> dict:
     return response.json()
 
 
-@pytest.mark.asyncio
-async def test_register_returns_user_without_password(client: AsyncClient) -> None:
-    body = await register_user(client)
+async def test_register_returns_user_without_password(api_client: ApiClientFactory) -> None:
+    body = await register_user(api_client())
 
     assert set(body) == {"id", "email"}
     assert body["email"] == "user@example.com"
 
 
-@pytest.mark.asyncio
-async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None:
+async def test_register_duplicate_email_returns_409(api_client: ApiClientFactory) -> None:
+    client = api_client()
     await register_user(client)
 
     response = await client.post(
@@ -78,7 +47,6 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
     assert response.json()["error"]["code"] == "CONFLICT"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("email", "password"),
     [
@@ -87,11 +55,11 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
     ],
 )
 async def test_register_invalid_data_returns_422(
-    client: AsyncClient,
+    api_client: ApiClientFactory,
     email: str,
     password: str,
 ) -> None:
-    response = await client.post(
+    response = await api_client().post(
         "/api/v1/auth/register",
         json={"email": email, "password": password},
     )
@@ -99,8 +67,8 @@ async def test_register_invalid_data_returns_422(
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_login_and_me(client: AsyncClient) -> None:
+async def test_login_and_me(api_client: ApiClientFactory) -> None:
+    client = api_client()
     registered = await register_user(client)
 
     login_response = await client.post(
@@ -135,10 +103,10 @@ async def test_login_and_me(client: AsyncClient) -> None:
     }
 
 
-@pytest.mark.asyncio
 async def test_login_with_wrong_credentials_returns_401(
-    client: AsyncClient,
+    api_client: ApiClientFactory,
 ) -> None:
+    client = api_client()
     await register_user(client)
 
     response = await client.post(
@@ -153,15 +121,14 @@ async def test_login_with_wrong_credentials_returns_401(
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
-@pytest.mark.asyncio
-async def test_me_without_token_returns_401(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/auth/me")
+async def test_me_without_token_returns_401(api_client: ApiClientFactory) -> None:
+    response = await api_client().get("/api/v1/auth/me")
 
     assert response.status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_me_rejects_invalid_tokens(client: AsyncClient) -> None:
+async def test_me_rejects_invalid_tokens(api_client: ApiClientFactory) -> None:
+    client = api_client()
     expired_token = create_access_token(
         uuid4(),
         now=datetime.now(UTC) - timedelta(minutes=61),
