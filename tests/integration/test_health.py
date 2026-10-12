@@ -25,5 +25,5 @@ def test_unhandled_error_does_not_expose_traceback() -> None:
     response = test_client.get("/boom")
 
     assert response.status_code == 500
-    assert response.json()["error"]["code"] == "internal_error"
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
     assert "sensitive internal information" not in response.text

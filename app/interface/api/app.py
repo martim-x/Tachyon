@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         logger.exception("Unhandled application error: %s", error)
         return JSONResponse(
-            error_body("internal_error", "Internal server error"),
+            error_body("INTERNAL_ERROR", "Internal server error"),
             status_code=500,
         )
 

@@ -19,3 +19,19 @@ class AuthenticationFailed(DomainError):
 
 class Conflict(DomainError):
     """Ресурс уже существует и не может быть создан повторно."""
+
+
+class ValidationError(DomainError):
+    """Бизнес-данные не прошли доменную проверку."""
+
+    def __init__(
+        self,
+        message: str = "Проверка данных не пройдена",
+        detail: list[dict[str, str]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.detail = detail or []
+
+
+class LimitExceeded(DomainError):
+    """Операция невозможна из-за превышения установленного лимита"""
