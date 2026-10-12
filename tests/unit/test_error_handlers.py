@@ -8,15 +8,21 @@ from fastapi.testclient import TestClient
 from app.core.errors import (
     AuthenticationFailed,
     Conflict,
+    LimitExceeded,
     NotFound,
     PermissionDenied,
+)
+from app.core.errors import (
+    ValidationError as DomainValidationError,
 )
 from app.core.user_context import get_current_user
 from app.interface.api.app import create_app
 from app.interface.api.exception_handlers import (
     authentication_failed_handler,
     conflict_handler,
+    domain_validation_error_handler,
     error_body,
+    limit_exceeded_handler,
     not_found_handler,
     permission_denied_handler,
     validation_error_handler,
@@ -82,3 +88,44 @@ async def test_conflict_handler_returns_409() -> None:
 
     assert response.status_code == 409
     assert json.loads(response.body)["error"]["code"] == "CONFLICT"
+
+
+async def test_domain_validation_error_returns_422() -> None:
+    error = DomainValidationError(
+        "Некорректная сумма",
+        detail=[{"field": "amount", "issue": "Сумма должна быть больше нуля"}],
+    )
+
+    response = await domain_validation_error_handler(None, error)
+    body = json.loads(response.body)
+
+    assert response.status_code == 422
+    assert body == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Некорректная сумма",
+            "detail": [
+                {
+                    "field": "amount",
+                    "issue": "Сумма должна быть больше нуля",
+                }
+            ],
+        }
+    }
+
+
+async def test_limit_exceeded_returns_409() -> None:
+    response = await limit_exceeded_handler(
+        None,
+        LimitExceeded("Месячный лимит превышен"),
+    )
+    body = json.loads(response.body)
+
+    assert response.status_code == 409
+    assert body == {
+        "error": {
+            "code": "LIMIT_EXCEEDED",
+            "message": "Месячный лимит превышен",
+            "detail": [],
+        }
+    }
