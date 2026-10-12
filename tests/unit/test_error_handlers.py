@@ -32,14 +32,20 @@ NOT_FOUND_BODY = error_body("NOT_FOUND", "Объект не найден")
 
 
 async def test_not_found_handler_returns_404() -> None:
-    response = await not_found_handler(None, NotFound("Category не найден"))
+    response = await not_found_handler(
+        None,
+        NotFound("Category не найден"),
+    )
 
     assert response.status_code == 404
     assert json.loads(response.body) == NOT_FOUND_BODY
 
 
 async def test_permission_denied_handler_is_indistinguishable() -> None:
-    response = await permission_denied_handler(None, PermissionDenied("нет контекста пользователя"))
+    response = await permission_denied_handler(
+        None,
+        PermissionDenied("нет контекста пользователя"),
+    )
 
     assert response.status_code == 404
     assert json.loads(response.body) == NOT_FOUND_BODY
@@ -47,15 +53,27 @@ async def test_permission_denied_handler_is_indistinguishable() -> None:
 
 async def test_validation_error_handler_returns_422_with_fields() -> None:
     error = RequestValidationError(
-        [{"loc": ("body", "name"), "msg": "Field required", "type": "missing"}],
+        [
+            {
+                "loc": ("body", "name"),
+                "msg": "Field required",
+                "type": "missing",
+            }
+        ],
         body=None,
     )
+
     response = await validation_error_handler(None, error)
+    body = json.loads(response.body)
 
     assert response.status_code == 422
-    body = json.loads(response.body)
     assert body["error"]["code"] == "VALIDATION_ERROR"
-    assert body["error"]["detail"] == [{"field": "name", "issue": "Field required"}]
+    assert body["error"]["detail"] == [
+        {
+            "field": "name",
+            "issue": "Field required",
+        }
+    ]
 
 
 def test_permission_denied_returns_404_over_http() -> None:
@@ -77,23 +95,40 @@ async def test_authentication_failed_handler_returns_401() -> None:
         None,
         AuthenticationFailed("неверный токен"),
     )
+    body = json.loads(response.body)
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
-    assert json.loads(response.body)["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["code"] == "UNAUTHORIZED"
 
 
-async def test_conflict_handler_returns_409() -> None:
-    response = await conflict_handler(None, Conflict("email занят"))
+async def test_conflict_handler_returns_safe_409() -> None:
+    response = await conflict_handler(
+        None,
+        Conflict("users.email=user@example.com"),
+    )
+    body = json.loads(response.body)
 
     assert response.status_code == 409
-    assert json.loads(response.body)["error"]["code"] == "CONFLICT"
+    assert body == {
+        "error": {
+            "code": "CONFLICT",
+            "message": "Email уже занят",
+            "detail": [],
+        }
+    }
+    assert "user@example.com" not in response.body.decode()
 
 
 async def test_domain_validation_error_returns_422() -> None:
     error = DomainValidationError(
-        "Некорректная сумма",
-        detail=[{"field": "amount", "issue": "Сумма должна быть больше нуля"}],
+        "Внутреннее правило расчёта",
+        detail=[
+            {
+                "field": "amount",
+                "issue": "Сумма должна быть больше нуля",
+            }
+        ],
     )
 
     response = await domain_validation_error_handler(None, error)
@@ -103,7 +138,7 @@ async def test_domain_validation_error_returns_422() -> None:
     assert body == {
         "error": {
             "code": "VALIDATION_ERROR",
-            "message": "Некорректная сумма",
+            "message": "Проверка данных не пройдена",
             "detail": [
                 {
                     "field": "amount",
@@ -112,12 +147,13 @@ async def test_domain_validation_error_returns_422() -> None:
             ],
         }
     }
+    assert "Внутреннее правило" not in response.body.decode()
 
 
-async def test_limit_exceeded_returns_409() -> None:
+async def test_limit_exceeded_returns_safe_409() -> None:
     response = await limit_exceeded_handler(
         None,
-        LimitExceeded("Месячный лимит превышен"),
+        LimitExceeded("Лимит пользователя 42 равен 1000"),
     )
     body = json.loads(response.body)
 
@@ -125,7 +161,8 @@ async def test_limit_exceeded_returns_409() -> None:
     assert body == {
         "error": {
             "code": "LIMIT_EXCEEDED",
-            "message": "Месячный лимит превышен",
+            "message": "Установленный лимит превышен",
             "detail": [],
         }
     }
+    assert "пользователя 42" not in response.body.decode()

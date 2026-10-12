@@ -66,9 +66,10 @@ async def authentication_failed_handler(
     )
 
 
-async def conflict_handler(_request: Request, exc: Conflict) -> JSONResponse:
+async def conflict_handler(_request: Request, _exc: Conflict) -> JSONResponse:
+    # Текст исключения не отдаём клиенту: он может содержать email или детали БД.
     return JSONResponse(
-        error_body("CONFLICT", str(exc) or "Конфликт данных"),
+        error_body("CONFLICT", "Email уже занят"),
         status_code=409,
     )
 
@@ -77,10 +78,11 @@ async def domain_validation_error_handler(
     _request: Request,
     exc: DomainValidationError,
 ) -> JSONResponse:
+    # Клиенту доступны только безопасные структурированные сведения о полях.
     return JSONResponse(
         error_body(
             "VALIDATION_ERROR",
-            str(exc) or "Проверка данных не пройдена",
+            "Проверка данных не пройдена",
             exc.detail,
         ),
         status_code=422,
@@ -89,12 +91,12 @@ async def domain_validation_error_handler(
 
 async def limit_exceeded_handler(
     _request: Request,
-    exc: LimitExceeded,
+    _exc: LimitExceeded,
 ) -> JSONResponse:
     return JSONResponse(
         error_body(
             "LIMIT_EXCEEDED",
-            str(exc) or "Установленный лимит превышен",
+            "Установленный лимит превышен",
         ),
         status_code=409,
     )
