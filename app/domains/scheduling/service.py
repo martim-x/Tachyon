@@ -63,10 +63,13 @@ def next_run(
         # Используем original_day если передан, иначе day из after
         day = original_day if original_day is not None else base.day
 
+        # Сдвигаем на interval месяцев без clamp на промежуточных месяцах
         for _ in range(interval):
             year, month = _next_month(year, month)
-            last_day = _last_day_of_month(year, month)
-            day = min(day, last_day)
+
+        # Clamp только для итогового месяца
+        last_day = _last_day_of_month(year, month)
+        day = min(day, last_day)
 
         return datetime(year, month, day, 12, 0, 0, tzinfo=UTC)
 
