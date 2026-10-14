@@ -1,6 +1,6 @@
 """API повторяющихся операций: CRUD правил, пауза/актив, генерация (docs/03 §S4.2)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -34,7 +34,15 @@ async def create_rule(
         note=payload.note,
         start_date=payload.start_date,
         end_date=payload.end_date,
-        next_run_at=payload.start_date,
+        next_run_at=datetime(
+            payload.start_date.year,
+            payload.start_date.month,
+            payload.start_date.day,
+            12,
+            0,
+            0,
+            tzinfo=UTC,
+        ),
     )
     service = RecurringService(session)
     return await service.create_rule(rule)
@@ -46,7 +54,7 @@ async def list_rules(
     session: SessionDep,
 ) -> list[RecurringRule]:
     service = RecurringService(session)
-    return await service.list_rules()
+    return await service.list_rules(str(_current_user.id))
 
 
 @router.get("/{rule_id}", response_model=RecurringRuleDTO)
@@ -56,12 +64,7 @@ async def get_rule(
     session: SessionDep,
 ) -> RecurringRule:
     service = RecurringService(session)
-    rule = await service.get_rule(str(rule_id))
-    if rule is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Правило не найдено")
-    return rule
+    return await service.get_rule(str(rule_id), str(_current_user.id))
 
 
 @router.patch("/{rule_id}", response_model=RecurringRuleDTO)
@@ -72,22 +75,9 @@ async def update_rule(
     session: SessionDep,
 ) -> RecurringRule:
     service = RecurringService(session)
-    rule = await service.update_rule(
-        str(rule_id),
-        category_id=payload.category_id,
-        kind=payload.kind,
-        interval=payload.interval,
-        amount_cents=payload.amount_cents,
-        note=payload.note,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
-        is_active=payload.is_active,
-    )
-    if rule is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Правило не найдено")
-    return rule
+    # model_dump(exclude_unset=True) — только переданные поля, None допустим для note/end_date
+    fields = payload.model_dump(exclude_unset=True)
+    return await service.update_rule(str(rule_id), str(_current_user.id), **fields)
 
 
 @router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -97,11 +87,7 @@ async def delete_rule(
     session: SessionDep,
 ) -> None:
     service = RecurringService(session)
-    ok = await service.delete_rule(str(rule_id))
-    if not ok:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Правило не найдено")
+    await service.delete_rule(str(rule_id), str(_current_user.id))
 
 
 class RunRulesRequest(BaseModel):
@@ -117,6 +103,7 @@ async def run_rules(
 ) -> list[RecurringExecutionDTO]:
     service = RecurringService(session)
     executions = await service.generate_due_operations(
+        user_id=str(_current_user.id),
         until=payload.until,
         dry_run=payload.dry_run,
     )

@@ -6,7 +6,11 @@
 
 from datetime import UTC, date, datetime, timedelta
 
-from app.core.clock import Clock
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.errors import NotFound
 from app.core.money import Money
 from app.domains.scheduling.models import RecurringExecution, RecurringRule
 from app.domains.scheduling.ports import OperationWriter
@@ -30,6 +34,7 @@ def next_run(
     after: datetime,
     *,
     interval: int = 1,
+    original_day: int | None = None,
 ) -> datetime:
     """Следующая дата запуска после `after` (включительно).
 
@@ -55,7 +60,8 @@ def next_run(
     if rule_kind == "monthly":
         year = base.year
         month = base.month
-        day = base.day
+        # Используем original_day если передан, иначе day из after
+        day = original_day if original_day is not None else base.day
 
         for _ in range(interval):
             year, month = _next_month(year, month)
@@ -67,94 +73,66 @@ def next_run(
     raise ValueError(f"unknown kind: {rule_kind}")
 
 
-def compute_next_run(
-    rule_kind: str,
-    start_date: date,
-    end_date: date | None,
-    after: datetime,
-    *,
-    interval: int = 1,
-    clock: Clock | None = None,
-) -> datetime | None:
-    """
-    Полный расчёт следующего запуска с учётом границ правила.
-
-    Возвращает None, если правило уже завершилось (после end_date или
-    следующего запуска нет до start_date).
-    """
-    if clock is None:
-        from app.core.clock import SystemClock
-
-        clock = SystemClock()
-
-    now = clock.now()
-
-    # Правило ещё не началось
-    if now < datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC):
-        return datetime(start_date.year, start_date.month, start_date.day, 12, 0, 0, tzinfo=UTC)
-
-    # Правило уже закончилось
-    if end_date is not None:
-        end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=UTC)
-        if now > end_dt:
-            return None
-
-    # Следующий запуск строго после `after` (который может быть now или last_run_at)
-    candidate = next_run(rule_kind, after, interval=interval)
-
-    # Проверка end_date для кандидата
-    if end_date is not None:
-        end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=UTC)
-        if candidate > end_dt:
-            return None
-
-    return candidate
-
-
 class RecurringService:
     """Бизнес-логика правил повтора: CRUD + генерация + идемпотентность."""
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         operation_writer: OperationWriter | None = None,
     ) -> None:
         self._session = session
         self._operation_writer = operation_writer
+
+    @property
+    def operation_writer(self) -> OperationWriter:
+        if self._operation_writer is None:
+            from app.domains.scheduling.ports import create_operation_impl
+
+            self._operation_writer = lambda **kw: create_operation_impl(self._session, **kw)
+        return self._operation_writer
 
     async def create_rule(self, rule: RecurringRule) -> RecurringRule:
         self._session.add(rule)
         await self._session.flush()
         return rule
 
-    async def get_rule(self, rule_id: str) -> RecurringRule | None:
-        return await self._session.get(RecurringRule, rule_id)
+    async def get_rule(self, rule_id: str, user_id: str) -> RecurringRule:
+        rule = await self._session.get(RecurringRule, rule_id)
+        if rule is None or rule.user_id != user_id:
+            raise NotFound("Правило не найдено")
+        return rule
 
-    async def list_rules(self) -> list[RecurringRule]:
-        from sqlalchemy import select
-        result = await self._session.execute(select(RecurringRule))
+    async def list_rules(self, user_id: str) -> list[RecurringRule]:
+        result = await self._session.execute(
+            select(RecurringRule).where(RecurringRule.user_id == user_id)
+        )
         return list(result.scalars().all())
 
-    async def update_rule(self, rule_id: str, **fields) -> RecurringRule | None:
-        rule = await self.get_rule(rule_id)
-        if rule is None:
-            return None
+    async def update_rule(
+        self,
+        rule_id: str,
+        user_id: str,
+        **fields,
+    ) -> RecurringRule:
+        rule = await self.get_rule(rule_id, user_id)
         for k, v in fields.items():
             if v is not None:
+                setattr(rule, k, v)
+            elif k in ("note", "end_date"):  # Разрешаем явно очистить эти поля
                 setattr(rule, k, v)
         await self._session.flush()
         return rule
 
-    async def delete_rule(self, rule_id: str) -> bool:
-        rule = await self.get_rule(rule_id)
-        if rule is None:
-            return False
+    async def delete_rule(self, rule_id: str, user_id: str) -> bool:
+        rule = await self.get_rule(rule_id, user_id)
         rule.is_active = False  # мягкое удаление
         await self._session.flush()
         return True
 
     async def generate_due_operations(
         self,
+        user_id: str,
         until: datetime | None = None,
         dry_run: bool = False,
     ) -> list[RecurringExecution]:
@@ -163,9 +141,10 @@ class RecurringService:
 
         Использует RecurringExecution с UNIQUE(rule_id, period_date) для идемпотентности:
         повторный вызов не создаёт дубликаты.
+
+        dry_run=True — только preview, не пишет в БД и не меняет состояние правил.
         """
         if self._operation_writer is None:
-            # Ленивая загрузка дефолтной реализации
             from app.domains.scheduling.ports import create_operation_impl
 
             self._operation_writer = lambda **kw: create_operation_impl(self._session, **kw)
@@ -175,50 +154,92 @@ class RecurringService:
 
             until = SystemClock().now()
 
-        rules = await self.list_rules()
-        created = []
+        rules = await self.list_rules(user_id)
+        created: list[RecurringExecution] = []
 
         for rule in rules:
             if not rule.is_active:
                 continue
-            if rule.end_date and rule.end_date < until.date():
-                continue
 
-            current = rule.next_run_at
+            # Определяем старт: max(start_date, last_run_at)
+            if rule.last_run_at is not None:
+                current = rule.last_run_at
+            else:
+                # Первый запуск — start_date в полдень UTC
+                current = datetime(
+                    rule.start_date.year,
+                    rule.start_date.month,
+                    rule.start_date.day,
+                    12,
+                    0,
+                    0,
+                    tzinfo=UTC,
+                )
+
+            # Сохраняем исходный день для monthly (чтобы не дрейфовать)
+            original_day = rule.start_date.day
+
             while current <= until:
-                # Идемпотентность: проверяем/создаём execution
+                # Проверка end_date для текущего периода
+                if rule.end_date is not None:
+                    end_dt = datetime(
+                        rule.end_date.year,
+                        rule.end_date.month,
+                        rule.end_date.day,
+                        23,
+                        59,
+                        59,
+                        tzinfo=UTC,
+                    )
+                    if current > end_dt:
+                        break
+
+                period_date = current.date()
+
+                # Идемпотентность: пытаемся создать execution
                 execution = RecurringExecution(
                     rule_id=rule.id,
-                    period_date=current.date(),
+                    user_id=rule.user_id,
+                    period_date=period_date,
                 )
                 self._session.add(execution)
                 try:
                     await self._session.flush()
-                except Exception:
-                    await self._session.rollback()
+                except IntegrityError:
                     # Уже существует — пропускаем этот период
-                    pass
-                else:
+                    await self._session.rollback()
+                    current = next_run(
+                        rule.kind, current, interval=rule.interval, original_day=original_day
+                    )
+                    continue
+
+                if not dry_run:
                     # Создаём операцию через порт
-                    if not dry_run:
-                        await self._operation_writer(
-                            category_id=rule.category_id,
-                            amount=Money(rule.amount_cents / 100),
-                            kind="expense",
-                            occurred_at=current,
-                            note=rule.note,
-                        )
+                    await self._operation_writer(
+                        user_id=rule.user_id,
+                        category_id=rule.category_id,
+                        amount=Money.from_cents(rule.amount_cents),
+                        kind="expense",
+                        occurred_at=current,
+                        note=rule.note,
+                        source="recurring",
+                    )
+                    created.append(execution)
+                else:
+                    # dry_run: создаём execution объект для ответа, но не пишем в БД
+                    # Откатываем flush для этого execution
+                    await self._session.rollback()
                     created.append(execution)
 
                 # Сдвигаем на следующий период
-                current = next_run(rule.kind, current, interval=rule.interval)
+                current = next_run(
+                    rule.kind, current, interval=rule.interval, original_day=original_day
+                )
 
-            # Обновляем next_run_at правила
-            rule.next_run_at = current
-            rule.last_run_at = current - timedelta(seconds=1)
-            await self._session.flush()
-
-        if not dry_run:
-            await self._session.commit()
+            # Обновляем next_run_at правила (только если не dry_run)
+            if not dry_run:
+                rule.next_run_at = current
+                rule.last_run_at = current - timedelta(seconds=1)
+                await self._session.flush()
 
         return created

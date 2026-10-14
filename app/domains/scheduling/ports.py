@@ -17,16 +17,18 @@ class OperationWriter(Protocol):
     async def __call__(
         self,
         *,
+        user_id: UUID,
         category_id: UUID,
         amount: Money,
         kind: str,
         occurred_at: datetime,
         note: str | None = None,
+        source: str = "recurring",
     ) -> None: ...
 
 
 OperationWriterFn = Callable[
-    [UUID, Money, str, datetime, str | None],
+    [UUID, UUID, Money, str, datetime, str | None, str],
     None,
 ]
 
@@ -34,20 +36,24 @@ OperationWriterFn = Callable[
 async def create_operation_impl(
     session,
     *,
+    user_id: UUID,
     category_id: UUID,
     amount: Money,
     kind: str,
     occurred_at: datetime,
     note: str | None = None,
+    source: str = "recurring",
 ) -> None:
     """Реализация по умолчанию через ledger repository (для тестов/дефолта)."""
     from app.domains.ledger.repository import OperationRepository
 
     repo = OperationRepository(session)
     fields: dict = {
+        "user_id": user_id,
         "category_id": category_id,
         "kind": kind,
         "note": note,
+        "source": source,
     }
     if occurred_at is not None:
         fields["occurred_at"] = occurred_at.astimezone(UTC)
