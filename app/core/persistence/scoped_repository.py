@@ -43,7 +43,9 @@ class ScopedRepository(Generic[T]):
     def _user_id(self) -> UUID:
         return get_current_user()  # PermissionDenied без контекста
 
-    def _scoped(self) -> Select[tuple[T]]:
+    def _scoped(self) -> Select[T]:
+        # SQLAlchemy 2.1 типизирует Select параметром-сущностью (Select[T]),
+        # в 2.0 было Select[tuple[T]]; проект закреплён на 2.1.
         return select(self.model).where(self.model.user_id == self._user_id)  # type: ignore[attr-defined]
 
     async def list(

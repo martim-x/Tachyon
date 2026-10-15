@@ -73,6 +73,17 @@ class CategoryDTO(BaseModel):
     is_default: bool
 
 
+class CategoryCreate(BaseModel):
+    """Тело POST /categories: только name и kind; остальное — дефолты.
+
+    max_length согласован с колонкой categories.name (String(50)):
+    более длинное имя не должно доходить до БД и падать с 500.
+    """
+
+    name: str = Field(min_length=1, max_length=50)
+    kind: Kind
+
+
 class OperationPageDTO(BaseModel):
     """Страница списка и метаданные общего количества (docs/03 §S3.2)."""
 

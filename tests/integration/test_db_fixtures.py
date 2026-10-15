@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,6 +17,7 @@ from tests.conftest import (
     UserFactory,
 )
 
+pytestmark = pytest.mark.integration
 
 async def test_db_session_schema_comes_from_migrations(
     db_session: async_sessionmaker[AsyncSession],
