@@ -2,12 +2,7 @@
 
 from uuid import uuid4
 
-from tests.conftest import (
-    ApiClientFactory,
-    CategoryFactory,
-    LoggedInClient,
-    OperationFactory,
-)
+from tests.conftest import ApiClientFactory, CategoryFactory, LoggedInClient, OperationFactory
 
 
 async def test_validation_error_has_unified_contract(

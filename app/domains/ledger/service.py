@@ -10,11 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.money import Money
 from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import CategoryRepository, OperationRepository
-from app.domains.ledger.schemas import (
-    OperationCreate,
-    OperationListQuery,
-    OperationUpdate,
-)
+from app.domains.ledger.schemas import OperationCreate, OperationListQuery, OperationUpdate
 
 
 class OperationService:

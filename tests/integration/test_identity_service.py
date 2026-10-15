@@ -4,6 +4,8 @@ from app.core.errors import AuthenticationFailed, Conflict
 from app.domains.identity.repository import UserRepository
 from app.domains.identity.service import IdentityService, verify_password
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_register_hashes_password(session) -> None:

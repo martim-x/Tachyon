@@ -13,6 +13,8 @@ from app.domains.forecasting import calendar_math
 from app.domains.forecasting.service import forecast_month, linear_forecast, money
 from app.domains.forecasting.strategies import RECENT_WINDOW, WHOLE_MONTH
 
+pytestmark = pytest.mark.unit
+
 
 def test_ac1_zero_spent_projects_zero() -> None:
     """AC1 Нулевые траты: октябрь 31 день, as_of 15-е, spent 0.00 -> projected 0.00."""
@@ -88,19 +90,39 @@ def test_forecast_recent_window_zero_days_returns_zero_pace() -> None:
     ("year", "month", "as_of_day", "spent", "expected_rate", "expected_projected"),
     [
         pytest.param(
-            2027, 2, 14, Decimal("700.00"), Decimal("50.00"), Decimal("1400.00"),
+            2027,
+            2,
+            14,
+            Decimal("700.00"),
+            Decimal("50.00"),
+            Decimal("1400.00"),
             id="ac5-february-28",
         ),
         pytest.param(
-            2028, 2, 10, Decimal("500.00"), Decimal("50.00"), Decimal("1450.00"),
+            2028,
+            2,
+            10,
+            Decimal("500.00"),
+            Decimal("50.00"),
+            Decimal("1450.00"),
             id="ac6-february-29-leap",
         ),
         pytest.param(
-            2026, 4, 15, Decimal("300.00"), Decimal("20.00"), Decimal("600.00"),
+            2026,
+            4,
+            15,
+            Decimal("300.00"),
+            Decimal("20.00"),
+            Decimal("600.00"),
             id="ac7-april-30",
         ),
         pytest.param(
-            2026, 1, 20, Decimal("1000.00"), Decimal("50.00"), Decimal("1550.00"),
+            2026,
+            1,
+            20,
+            Decimal("1000.00"),
+            Decimal("50.00"),
+            Decimal("1550.00"),
             id="ac8-january-31",
         ),
     ],

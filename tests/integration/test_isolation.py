@@ -17,6 +17,9 @@ from app.domains.notification.repository import NotificationRepository
 from app.domains.scheduling.repository import RecurringExecutionRepository, RecurringRuleRepository
 from tests.integration import factories
 
+pytestmark = pytest.mark.integration
+
+
 CASES = [
     (CategoryRepository, "categories", factories.create_category, "name", "Транспорт"),
     (OperationRepository, "operations", factories.create_operation, "note", "взломано"),
@@ -108,9 +111,7 @@ async def test_isolation_foreign_object_invisible_and_untouched(
         assert getattr(row, field) != value
 
 
-@pytest.mark.parametrize(
-    "repo_cls", [case[0] for case in CASES], ids=[case[1] for case in CASES]
-)
+@pytest.mark.parametrize("repo_cls", [case[0] for case in CASES], ids=[case[1] for case in CASES])
 async def test_isolation_repository_without_context_raises(session, repo_cls) -> None:
     """Пустой контекст - это исключение, а не пустая выдача (docs/02 механизм 3)."""
     repo = repo_cls(session)
@@ -215,9 +216,7 @@ def test_isolation_user_id_constraints_in_every_domain_table() -> None:
         "recurring_rules",
         "recurring_executions",
     }
-    tables = {
-        name: table for name, table in Base.metadata.tables.items() if name != "users"
-    }
+    tables = {name: table for name, table in Base.metadata.tables.items() if name != "users"}
     assert set(tables) == expected
 
     for name, table in tables.items():

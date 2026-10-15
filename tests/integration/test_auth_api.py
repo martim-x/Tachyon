@@ -11,6 +11,8 @@ from app.core.config import get_settings
 from app.domains.identity.service import create_access_token
 from tests.conftest import ApiClientFactory
 
+pytestmark = pytest.mark.integration
+
 
 async def register_user(client: AsyncClient) -> dict:
     response = await client.post(

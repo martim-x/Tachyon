@@ -67,15 +67,11 @@ class OperationRepository(ScopedRepository[Operation]):
         if kind is not None:
             stmt = stmt.where(Operation.kind == kind)
 
-        counted = await self._session.execute(
-            select(func.count()).select_from(stmt.subquery())
-        )
+        counted = await self._session.execute(select(func.count()).select_from(stmt.subquery()))
         total = counted.scalar_one()
 
         ordered = stmt.order_by(Operation.occurred_at.desc(), Operation.id.desc())
-        listed = await self._session.execute(
-            ordered.offset((page - 1) * limit).limit(limit)
-        )
+        listed = await self._session.execute(ordered.offset((page - 1) * limit).limit(limit))
         return listed.scalars().all(), total
 
 

@@ -7,6 +7,8 @@ import pytest
 from app.core.errors import PermissionDenied
 from app.core.user_context import get_current_user, reset_current_user, set_current_user, user_scope
 
+pytestmark = pytest.mark.unit
+
 
 def test_get_current_user_without_context_raises() -> None:
     with pytest.raises(PermissionDenied, match="контекст"):

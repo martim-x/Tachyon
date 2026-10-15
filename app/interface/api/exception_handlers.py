@@ -15,9 +15,7 @@ from app.core.errors import (
     NotFound,
     PermissionDenied,
 )
-from app.core.errors import (
-    ValidationError as DomainValidationError,
-)
+from app.core.errors import ValidationError as DomainValidationError
 from app.interface.api.schemas import ErrorContent, ErrorResponse
 
 

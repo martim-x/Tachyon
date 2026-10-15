@@ -12,9 +12,7 @@ from app.core.errors import (
     NotFound,
     PermissionDenied,
 )
-from app.core.errors import (
-    ValidationError as DomainValidationError,
-)
+from app.core.errors import ValidationError as DomainValidationError
 from app.core.user_context import get_current_user
 from app.interface.api.app import create_app
 from app.interface.api.exception_handlers import (

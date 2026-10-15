@@ -10,6 +10,8 @@ from app.domains.identity.models import User
 from app.domains.ledger.repository import CategoryRepository
 from tests.integration import factories
 
+pytestmark = pytest.mark.integration
+
 
 class UserRepositoryAttempt(ScopedRepository[User]):
     model = User

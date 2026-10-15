@@ -7,10 +7,7 @@ from app.core.logging import configure_logging
 from app.domains.identity.api import router as identity_router
 from app.domains.ledger.api import router as ledger_router
 from app.domains.scheduling.api import router as scheduling_router
-from app.interface.api.exception_handlers import (
-    error_body,
-    register_exception_handlers,
-)
+from app.interface.api.exception_handlers import error_body, register_exception_handlers
 
 logger = logging.getLogger(__name__)
 

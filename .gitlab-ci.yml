@@ -1,17 +1,83 @@
 image: "python:3.12-slim"
 
 stages:
-  - test
+  - lint-imports
+  - lint-style
+  - lint-types
+  - lint-security
+  - test-unit
+  - test-integration
+  - db
 
-tests:
-  stage: test
-
+# ─── LINTERS (параллельно) ───
+lint-imports:
+  stage: lint-imports
   before_script:
-    - python -m pip install -r requirements.txt
-    - cp .env.example .env
+    - python -m pip install -e ".[dev]"
+  script:
+    - python -m isort --check-only --diff .
+  allow_failure: false
 
+lint-style:
+  stage: lint-style
+  before_script:
+    - python -m pip install -e ".[dev]"
   script:
     - python -m ruff check .
-    - python -m pytest -q
+  allow_failure: false
+
+lint-types:
+  stage: lint-types
+  before_script:
+    - python -m pip install -e ".[dev]"
+  script:
+    - python -m mypy app
+  allow_failure: false
+
+lint-security:
+  stage: lint-security
+  before_script:
+    - python -m pip install -e ".[dev]"
+  script:
+    - python -m bandit -r app -c pyproject.toml -ll -iii -f json -o bandit-report.json
+  artifacts:
+    paths:
+      - bandit-report.json
+    when: always
+    expire_in: 1 week
+  allow_failure: false
+
+# ─── TESTS ───
+test-unit:
+  stage: test-unit
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "unit" --ignore=tests/e2e
+  allow_failure: false
+
+test-integration:
+  stage: test-integration
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "integration"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG
+    - if: $RUN_INTEGRATION == "true"
+  allow_failure: false
+
+# ─── DB ───
+db:
+  stage: db
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
     - alembic upgrade head
     - alembic downgrade base
+    - alembic upgrade head
+  allow_failure: false
