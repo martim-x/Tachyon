@@ -2,6 +2,7 @@
 
 import json
 
+import pytest
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
@@ -25,6 +26,8 @@ from app.interface.api.exception_handlers import (
     permission_denied_handler,
     validation_error_handler,
 )
+
+pytestmark = pytest.mark.unit
 
 NOT_FOUND_BODY = error_body("NOT_FOUND", "Объект не найден")
 
@@ -103,7 +106,7 @@ async def test_authentication_failed_handler_returns_401() -> None:
 async def test_conflict_handler_returns_safe_409() -> None:
     response = await conflict_handler(
         None,
-        Conflict("users.email=user@example.com"),
+        Conflict("users.email=user@example.com", safe_message="Email уже занят"),
     )
     body = json.loads(response.body)
 
@@ -115,6 +118,19 @@ async def test_conflict_handler_returns_safe_409() -> None:
             "detail": [],
         }
     }
+    assert "user@example.com" not in response.body.decode()
+
+
+async def test_conflict_handler_hides_message_without_safe_text() -> None:
+    """Без safe_message клиент получает нейтральный текст, а не str(exc)."""
+    response = await conflict_handler(
+        None,
+        Conflict("users.email=user@example.com"),
+    )
+    body = json.loads(response.body)
+
+    assert response.status_code == 409
+    assert body["error"]["message"] == "Ресурс уже существует"
     assert "user@example.com" not in response.body.decode()
 
 

@@ -36,6 +36,6 @@ class UserRepository:
             await self._session.flush()
         except IntegrityError as error:
             await self._session.rollback()
-            raise Conflict("Email уже занят") from error
+            raise Conflict("Email уже занят", safe_message="Email уже занят") from error
 
         return user

@@ -1,23 +1,19 @@
 image: "python:3.12-slim"
 
+variables:
+  # Тестовое значение только для CI; реальный ключ приходит из окружения деплоя.
+  SECRET_KEY: "ci-test-secret-key-0123456789abcdef"
+
 stages:
-  - lint-imports
   - lint-style
   - lint-types
   - lint-security
   - test-unit
   - test-integration
+  - test-e2e
   - db
 
 # ─── LINTERS (параллельно) ───
-lint-imports:
-  stage: lint-imports
-  before_script:
-    - python -m pip install -e ".[dev]"
-  script:
-    - python -m isort --check-only --diff .
-  allow_failure: false
-
 lint-style:
   stage: lint-style
   before_script:
@@ -54,7 +50,7 @@ test-unit:
     - python -m pip install -e ".[dev]"
     - cp .env.example .env
   script:
-    - python -m pytest -q -m "unit" --ignore=tests/e2e
+    - python -m pytest -q -m "unit"
   allow_failure: false
 
 test-integration:
@@ -64,10 +60,15 @@ test-integration:
     - cp .env.example .env
   script:
     - python -m pytest -q -m "integration"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_TAG
-    - if: $RUN_INTEGRATION == "true"
+  allow_failure: false
+
+test-e2e:
+  stage: test-e2e
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "e2e"
   allow_failure: false
 
 # ─── DB ───

@@ -5,12 +5,19 @@ from datetime import UTC
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import Conflict
 from app.core.money import Money
 from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import CategoryRepository, OperationRepository
-from app.domains.ledger.schemas import OperationCreate, OperationListQuery, OperationUpdate
+from app.domains.ledger.schemas import (
+    CategoryCreate,
+    OperationCreate,
+    OperationListQuery,
+    OperationUpdate,
+)
 
 
 class OperationService:
@@ -63,3 +70,17 @@ class CategoryService:
 
     async def list(self) -> Sequence[Category]:
         return await self._categories.list()
+
+    async def create(self, payload: CategoryCreate) -> Category:
+        # user_id добавляет ScopedRepository, а не клиент (docs/02).
+        fields = payload.model_dump(exclude_unset=True)
+        fields.setdefault("color", "#6366f1")
+        fields.setdefault("is_default", False)
+        try:
+            return await self._categories.create(**fields)
+        except IntegrityError as error:
+            # ix_categories_user_name: имя уникально в пределах пользователя.
+            raise Conflict(
+                "Категория с таким именем уже существует",
+                safe_message="Категория с таким именем уже существует",
+            ) from error

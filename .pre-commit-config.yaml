@@ -6,14 +6,19 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
     hooks:
       - id: mypy
-        args: [--config-file=pyproject.toml]
-        additional_dependencies: [types-requests]
+        args: [--config-file=pyproject.toml, --install-types, --non-interactive]
+        additional_dependencies:
+          - pydantic
+          - fastapi
+          - sqlalchemy
+          - alembic
+          - pydantic-settings
+          - email-validator
+          - bcrypt
+          - PyJWT
+        pass_filenames: true
+        files: ^app/

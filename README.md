@@ -176,10 +176,7 @@ pre-commit install
 
 ### Линтеры (в CI — отдельными стадиями)
 ```bash
-# Импорты
-isort --check-only --diff .
-
-# Стиль
+# Стиль и импорты
 ruff check .
 
 # Типы
@@ -207,10 +204,10 @@ pytest -q
 ### CI Pipeline
 | Stage | Job | Назначение |
 |-------|-----|------------|
-| lint-imports | isort | Порядок импортов |
-| lint-style | ruff | Стиль, ошибки |
+| lint-style | ruff | Стиль, импорты, ошибки |
 | lint-types | mypy | Статические типы |
 | lint-security | bandit | Security audit |
 | test-unit | pytest -m unit | Быстрые тесты |
-| test-integration | pytest -m integration | Интеграционные (scheduled) |
+| test-integration | pytest -m integration | Интеграционные тесты |
+| test-e2e | pytest -m e2e | Сквозные сценарии |
 | db | alembic | Миграции up/down/up |
