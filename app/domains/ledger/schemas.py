@@ -12,12 +12,19 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
 
 MAX_NOTE_LENGTH = 500
 MAX_AMOUNT = Field(max_digits=9, decimal_places=2, gt=0)
 
 Kind = Literal["income", "expense"]
+
+
+def _strip_name(value: object) -> object:
+    """Пробелы по краям не считаются частью имени: строка из пробелов — пустая."""
+    if isinstance(value, str):
+        return value.strip()
+    return value
 
 
 class OperationCreate(BaseModel):
@@ -78,10 +85,39 @@ class CategoryCreate(BaseModel):
 
     max_length согласован с колонкой categories.name (String(50)):
     более длинное имя не должно доходить до БД и падать с 500.
+    user_id клиент не задаёт: его ставит ScopedRepository из UserContext.
     """
 
     name: str = Field(min_length=1, max_length=50)
     kind: Kind
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _normalize_name(cls, value: object) -> object:
+        return _strip_name(value)
+
+
+class CategoryUpdate(BaseModel):
+    """Тело PATCH /categories/{id}: меняются только переданные поля."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    kind: Kind | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _normalize_name(cls, value: object) -> object:
+        return _strip_name(value)
+
+    @model_validator(mode="after")
+    def _not_null_columns_stay_not_null(self) -> "CategoryUpdate":
+        forbidden = {
+            name
+            for name in ("name", "kind")
+            if name in self.model_fields_set and getattr(self, name) is None
+        }
+        if forbidden:
+            raise ValueError(f"нельзя обнулить: {', '.join(sorted(forbidden))}")
+        return self
 
 
 class OperationPageDTO(BaseModel):

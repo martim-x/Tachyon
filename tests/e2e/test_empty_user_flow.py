@@ -208,11 +208,11 @@ async def test_empty_user_two_users_isolated(
     assert c2_ops["total"] == 1
     assert c2_ops["items"][0]["id"] == op2["id"]
 
-    # Попытка доступа к чужим данным: операция чужому пользователю не отдаётся.
-    # Изоляция категорий уже проверена списками выше (len == 1, свои id);
-    # отдельного GET /api/v1/categories/{id} в API нет, поэтому здесь его не проверяем.
+    # Попытка доступа к чужим данным: и операция, и категория по id — 404.
     assert (await c1.get(f"/api/v1/operations/{op2['id']}")).status_code == 404
     assert (await c2.get(f"/api/v1/operations/{op1['id']}")).status_code == 404
+    assert (await c1.get(f"/api/v1/categories/{cat2['id']}")).status_code == 404
+    assert (await c2.get(f"/api/v1/categories/{cat1['id']}")).status_code == 404
 
 
 async def test_empty_user_invalid_login_then_valid(

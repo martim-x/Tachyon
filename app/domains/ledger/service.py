@@ -14,10 +14,14 @@ from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import CategoryRepository, OperationRepository
 from app.domains.ledger.schemas import (
     CategoryCreate,
+    CategoryUpdate,
     OperationCreate,
     OperationListQuery,
     OperationUpdate,
 )
+
+DUPLICATE_CATEGORY_MESSAGE = "Категория с таким именем уже существует"
+CATEGORY_IN_USE_MESSAGE = "Нельзя удалить категорию, пока на неё ссылаются операции"
 
 
 class OperationService:
@@ -65,11 +69,18 @@ class OperationService:
 
 
 class CategoryService:
+    """Сценарии категорий: user_id берётся из UserContext внутри репозитория."""
+
     def __init__(self, session: AsyncSession) -> None:
+        self._session = session
         self._categories = CategoryRepository(session)
+        self._operations = OperationRepository(session)
 
     async def list(self) -> Sequence[Category]:
         return await self._categories.list()
+
+    async def get(self, category_id: UUID) -> Category:
+        return await self._categories.get_or_404(category_id)
 
     async def create(self, payload: CategoryCreate) -> Category:
         # user_id добавляет ScopedRepository, а не клиент (docs/02).
@@ -80,7 +91,29 @@ class CategoryService:
             return await self._categories.create(**fields)
         except IntegrityError as error:
             # ix_categories_user_name: имя уникально в пределах пользователя.
+            await self._session.rollback()
             raise Conflict(
-                "Категория с таким именем уже существует",
-                safe_message="Категория с таким именем уже существует",
+                DUPLICATE_CATEGORY_MESSAGE,
+                safe_message=DUPLICATE_CATEGORY_MESSAGE,
             ) from error
+
+    async def update(self, category_id: UUID, payload: CategoryUpdate) -> Category:
+        fields = payload.model_dump(exclude_unset=True)
+        try:
+            return await self._categories.update(category_id, **fields)
+        except IntegrityError as error:
+            await self._session.rollback()
+            raise Conflict(
+                DUPLICATE_CATEGORY_MESSAGE,
+                safe_message=DUPLICATE_CATEGORY_MESSAGE,
+            ) from error
+
+    async def delete(self, category_id: UUID) -> None:
+        """Чужая категория — 404. Своя с операциями не удаляется."""
+        await self._categories.get_or_404(category_id)
+        if await self._operations.exists_for_category(category_id):
+            raise Conflict(
+                CATEGORY_IN_USE_MESSAGE,
+                safe_message=CATEGORY_IN_USE_MESSAGE,
+            )
+        await self._categories.delete(category_id)
