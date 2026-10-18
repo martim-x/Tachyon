@@ -116,4 +116,11 @@ class CategoryService:
                 CATEGORY_IN_USE_MESSAGE,
                 safe_message=CATEGORY_IN_USE_MESSAGE,
             )
-        await self._categories.delete(category_id)
+        try:
+            await self._categories.delete(category_id)
+        except IntegrityError as error:
+            await self._session.rollback()
+            raise Conflict(
+                CATEGORY_IN_USE_MESSAGE,
+                safe_message=CATEGORY_IN_USE_MESSAGE,
+            ) from error
