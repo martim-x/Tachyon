@@ -1,14 +1,14 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from decimal import Decimal, ROUND_HALF_UP
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from app.core.persistence.session import get_session, engine
-from app.core.persistence.base import Base
+from app.core.persistence.session import get_session
 from app.domains.budget.models import BudgetLimit
 from app.domains.budget.service import limit_status
 
@@ -20,53 +20,72 @@ class LimitCreate(BaseModel):
     month: date
     limit_amount_cents: int
 
-@router.post('', status_code=201)
-def create_limit(payload: LimitCreate, db: Session = Depends(get_session)):
+@router.post('', status_code=201, dependencies= [Depends(get_session)])
+async def create_limit(payload: LimitCreate, request: Request):
+    db: AsyncSession = request.state.db
     if payload.limit_amount_cents <= 0:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail='Лимит должен быть больше 0')
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            detail='Лимит должен быть больше 0')
 
-    existing = db.query(BudgetLimit).filter(
+    stmt = select(BudgetLimit).where(
         BudgetLimit.user_id == payload.user_id,
         BudgetLimit.category_id == payload.category_id,
         BudgetLimit.month == payload.month,
-    ).first()
+    )
+    result = await db.execute(stmt)
+    existing = result.scalars().first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Лимит уже существует')
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail='Лимит уже существует')
 
     new_limit = BudgetLimit(**payload.model_dump())
     db.add(new_limit)
-    db.commit()
-    db.refresh(new_limit)
+
     return new_limit
 
-@router.get('', response_model=list[BudgetLimit])
-def limits_list(user_id: UUID, db: Session = Depends(get_session)):
-    return db.query(BudgetLimit).filter(BudgetLimit.user_id == user_id).all()
+@router.get('', response_model=list[BudgetLimit], dependencies= [Depends(get_session)])
+async def limits_list(user_id: UUID, request: Request):
+    db: AsyncSession = request.state.db
 
-@router.put('/{category_id}')
-def update_limit(category_id: UUID, user_id: UUID, month: date, limit_amount_cents: int, db: Session = Depends(get_session)):
+    stmt = select(BudgetLimit).where(BudgetLimit.user_id == user_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@router.put('/{category_id}', dependencies= [Depends(get_session)])
+async def update_limit(category_id: UUID, user_id: UUID, month: date,
+                       limit_amount_cents: int, request: Request):
+    db: AsyncSession = request.state.db
+
     if limit_amount_cents <= 0:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail='Лимит должен быть больше 0')
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            detail='Лимит должен быть больше 0')
 
-    limit = db.query(BudgetLimit).filter(
+    stmt = select(BudgetLimit).where(
         BudgetLimit.user_id == user_id,
         BudgetLimit.category_id == category_id,
         BudgetLimit.month == month,
-    ).first()
+    )
+    result = await db.execute(stmt)
+    limit = result.scalars().first()
+
     if not limit:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Не найдено')
 
     limit.limit_amount_cents = limit_amount_cents
-    db.commit()
-    db.refresh(limit)
+    await db.refresh(limit)
     return limit
 
-@router.get('/status')
-def get_statuses(user_id: UUID, db: Session = Depends(get_session)):
-    limits = db.query(BudgetLimit).filter(BudgetLimit.user_id == user_id).all()
-    result = []
-    for l in limits:
-        limit_dec = Decimal(l.limit_amount_cents) / Decimal('100')
+@router.get('/status', dependencies= [Depends(get_session)])
+async def get_statuses(user_id: UUID, request: Request):
+    db: AsyncSession = request.state.db
+
+    stmt = select(BudgetLimit).where(BudgetLimit.user_id == user_id)
+    result = await db.execute(stmt)
+    limits = result.scalars().all()
+
+    result_data = []
+    for limit_obj in limits:
+        limit_dec = Decimal(limit_obj.limit_amount_cents) / Decimal('100')
         spent_dec = Decimal('0')
         projected_dec = Decimal('0')
 
@@ -76,12 +95,12 @@ def get_statuses(user_id: UUID, db: Session = Depends(get_session)):
             if limit_dec > 0 else Decimal('0')
         )
 
-        result.append({
-            'limit_amount_cents': l.limit_amount_cents,
+        result_data.append({
+            'limit_amount_cents': limit_obj.limit_amount_cents,
             'spent_amount_cents': 0,
-            'remaining_amount_cents': l.limit_amount_cents,
+            'remaining_amount_cents': limit_obj.limit_amount_cents,
             'projected_amount_cents': 0,
             'percent': percent,
             'status': status_val.name
         })
-    return result
+    return result_data
