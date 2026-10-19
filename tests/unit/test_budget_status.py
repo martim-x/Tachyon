@@ -1,6 +1,9 @@
-import pytest
 from decimal import Decimal
-from app.domains.budget.service import limit_status, LimitStatus
+
+import pytest
+
+from app.domains.budget.service import LimitStatus, limit_status
+
 
 @pytest.mark.parametrize(
     'limit, spent, projected, expected',

@@ -1,7 +1,5 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum, auto
-from typing import Optional
-
 
 
 class LimitStatus(Enum):
@@ -13,7 +11,7 @@ class LimitStatus(Enum):
 
 LIMIT_WARNING_RATIO = Decimal("0.8")
 
-def limit_status(limit: Optional[Decimal], spent: Decimal, projected: Decimal) -> LimitStatus:
+def limit_status(limit: Decimal | None, spent: Decimal, projected: Decimal) -> LimitStatus:
     """Возвращает статус лимита:
     - ОК: даже с учетом прогноза не превышает лимит
     - WARNING: прогноз превышает 80%, но пока не превышен
