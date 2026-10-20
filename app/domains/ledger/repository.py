@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 
 from app.core.money import Money
 from app.core.persistence.scoped_repository import ScopedRepository
@@ -73,6 +73,16 @@ class OperationRepository(ScopedRepository[Operation]):
         ordered = stmt.order_by(Operation.occurred_at.desc(), Operation.id.desc())
         listed = await self._session.execute(ordered.offset((page - 1) * limit).limit(limit))
         return listed.scalars().all(), total
+
+    async def exists_for_category(self, category_id: UUID) -> bool:
+        """Есть ли операция текущего пользователя в этой категории.
+
+        Фильтр user_id берётся из _scoped: чужие операции не видны и не
+        блокируют удаление чужой категории (её и так не отдаст get_or_404).
+        """
+        scoped = self._scoped().where(Operation.category_id == category_id)
+        found = await self._session.execute(select(exists(scoped)))
+        return bool(found.scalar_one())
 
 
 class CategoryRepository(ScopedRepository[Category]):

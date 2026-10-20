@@ -10,6 +10,7 @@ from app.domains.ledger.repository import OperationRepository
 from app.domains.ledger.schemas import (
     CategoryCreate,
     CategoryDTO,
+    CategoryUpdate,
     Kind,
     OperationCreate,
     OperationDTO,
@@ -129,3 +130,45 @@ async def create_category(
 ) -> CategoryDTO:
     category = await CategoryService(session).create(payload)
     return _category_dto(category)
+
+
+@router.get(
+    "/categories/{category_id}",
+    response_model=CategoryDTO,
+    tags=["Категории"],
+)
+async def get_category(
+    category_id: UUID,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> CategoryDTO:
+    category = await CategoryService(session).get(category_id)
+    return _category_dto(category)
+
+
+@router.patch(
+    "/categories/{category_id}",
+    response_model=CategoryDTO,
+    tags=["Категории"],
+)
+async def patch_category(
+    category_id: UUID,
+    payload: CategoryUpdate,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> CategoryDTO:
+    category = await CategoryService(session).update(category_id, payload)
+    return _category_dto(category)
+
+
+@router.delete(
+    "/categories/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Категории"],
+)
+async def delete_category(
+    category_id: UUID,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> None:
+    await CategoryService(session).delete(category_id)
