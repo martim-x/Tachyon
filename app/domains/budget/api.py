@@ -1,10 +1,11 @@
 
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,7 @@ from app.core.persistence.session import get_session
 from app.domains.budget.models import BudgetLimit
 from app.domains.budget.service import limit_status
 
+DbSession = Annotated[AsyncSession, Depends(get_session)]
 router = APIRouter(prefix='/api/v1/budget_limits', tags=['budget-limits'])
 
 class LimitCreate(BaseModel):
@@ -20,9 +22,16 @@ class LimitCreate(BaseModel):
     month: date
     limit_amount_cents: int
 
-@router.post('', status_code=201, dependencies= [Depends(get_session)])
-async def create_limit(payload: LimitCreate, request: Request):
-    db: AsyncSession = request.state.db
+class LimitRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    category_id: UUID
+    month: date
+    limit_amount_cents: int
+
+@router.post('', status_code=201)
+async def create_limit(payload: LimitCreate, db: DbSession):
     if payload.limit_amount_cents <= 0:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                             detail='Лимит должен быть больше 0')
@@ -43,18 +52,16 @@ async def create_limit(payload: LimitCreate, request: Request):
 
     return new_limit
 
-@router.get('', response_model=list[BudgetLimit], dependencies= [Depends(get_session)])
-async def limits_list(user_id: UUID, request: Request):
-    db: AsyncSession = request.state.db
+@router.get("", response_model=list[LimitRead])
+async def limits_list(user_id: UUID, db: DbSession):
 
     stmt = select(BudgetLimit).where(BudgetLimit.user_id == user_id)
     result = await db.execute(stmt)
     return result.scalars().all()
 
-@router.put('/{category_id}', dependencies= [Depends(get_session)])
+@router.put('/{category_id}')
 async def update_limit(category_id: UUID, user_id: UUID, month: date,
-                       limit_amount_cents: int, request: Request):
-    db: AsyncSession = request.state.db
+                       limit_amount_cents: int, db: DbSession):
 
     if limit_amount_cents <= 0:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -75,9 +82,8 @@ async def update_limit(category_id: UUID, user_id: UUID, month: date,
     await db.refresh(limit)
     return limit
 
-@router.get('/status', dependencies= [Depends(get_session)])
-async def get_statuses(user_id: UUID, request: Request):
-    db: AsyncSession = request.state.db
+@router.get('/status')
+async def get_statuses(user_id: UUID, db: DbSession):
 
     stmt = select(BudgetLimit).where(BudgetLimit.user_id == user_id)
     result = await db.execute(stmt)

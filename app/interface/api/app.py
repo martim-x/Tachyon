@@ -4,9 +4,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.core.logging import configure_logging
+from app.domains.budget.api import router as budget_router
 from app.domains.identity.api import router as identity_router
 from app.domains.ledger.api import router as ledger_router
-from app.domains.budget.api import router as budget_router
 from app.interface.api.exception_handlers import (
     error_body,
     register_exception_handlers,
