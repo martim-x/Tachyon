@@ -12,7 +12,7 @@ from app.main import app
 
 TestBase = declarative_base()
 
-class TestBudgetLimit(TestBase):
+class BudgetLimitTestModel(TestBase):
     __tablename__ = 'budget_limits'
     id = Column(Integer, primary_key=True)
     user_id = Column(String(36), nullable=False, index=True)

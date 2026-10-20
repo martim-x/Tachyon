@@ -23,7 +23,7 @@ def limit_status(limit: Decimal | None, spent: Decimal, projected: Decimal) -> L
        Если percent >= 0.8 → WARNING.
     4. Иначе -> OK
     """
-    if limit <= 0:
+    if limit is None or limit <= 0:
         return LimitStatus.OK
 
     if spent >= limit:
@@ -33,7 +33,7 @@ def limit_status(limit: Decimal | None, spent: Decimal, projected: Decimal) -> L
         return LimitStatus.EXCEEDED_PROJECTED
 
     percent = (spent / limit).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
-    if percent > LIMIT_WARNING_RATIO:
+    if percent >= LIMIT_WARNING_RATIO:
         return LimitStatus.WARNING
 
 
