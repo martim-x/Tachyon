@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.clock import SystemClock
 from app.core.config import get_settings
@@ -24,14 +26,35 @@ logger = logging.getLogger(__name__)
 
 
 async def generate_due_operations_job() -> None:
-    """Запустить генерацию для всех пользователей в отдельной транзакции."""
+    """Запустить генерацию на engine, принадлежащем текущему event loop.
 
-    async with session_scope() as session:
-        service = RecurringService(session)
-        await service.generate_due_operations(
-            user_id=None,
-            until=SystemClock().now(),
-        )
+    BackgroundScheduler запускает задачу в отдельном потоке, поэтому нельзя
+    использовать глобальный async engine приложения: его соединения могут
+    принадлежать другому event loop.
+    """
+
+    settings = get_settings()
+
+    job_engine = create_async_engine(
+        settings.database_url,
+        poolclass=NullPool,
+    )
+    job_session_factory = async_sessionmaker(
+        bind=job_engine,
+        expire_on_commit=False,
+    )
+
+    try:
+        async with session_scope(job_session_factory) as session:
+            service = RecurringService(session)
+            await service.generate_due_operations(
+                user_id=None,
+                until=SystemClock().now(),
+                continue_on_error=True,
+            )
+    finally:
+        # Engine создаётся и уничтожается внутри одного event loop.
+        await job_engine.dispose()
 
 
 def run_generate_due_operations_job() -> None:

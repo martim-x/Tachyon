@@ -4,6 +4,7 @@
 Зависит от порта OperationWriter, не от ledger напрямую.
 """
 
+import logging
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -15,6 +16,8 @@ from app.core.errors import NotFound
 from app.core.money import Money
 from app.domains.scheduling.models import RecurringExecution, RecurringRule
 from app.domains.scheduling.ports import OperationWriter
+
+logger = logging.getLogger(__name__)
 
 
 def _last_day_of_month(year: int, month: int) -> int:
@@ -140,11 +143,12 @@ class RecurringService:
         until: datetime | None = None,
         dry_run: bool = False,
         date_from: datetime | None = None,
+        continue_on_error: bool = False,
     ) -> list[RecurringExecution]:
         """Создать операции за все наступившие периоды.
 
-        UNIQUE(rule_id, period_date) является последним рубежом
-        идемпотентности при параллельных запусках.
+        Каждое правило выполняется в собственном savepoint. Фоновый запуск
+        может продолжить работу после ошибки одного правила.
         """
 
         def as_utc(value: datetime) -> datetime:
@@ -162,8 +166,6 @@ class RecurringService:
 
         statement = select(RecurringRule).where(RecurringRule.is_active.is_(True))
 
-        # Ручной запуск обрабатывает правила текущего пользователя.
-        # Фоновый планировщик передаёт user_id=None и обрабатывает всех.
         if user_id is not None:
             statement = statement.where(RecurringRule.user_id == user_id)
 
@@ -173,90 +175,126 @@ class RecurringService:
         generated: list[RecurringExecution] = []
 
         for rule in rules:
-            # next_run_at — единственный указатель следующего периода.
-            # last_run_at нельзя использовать как старт: иначе период
-            # может быть обработан повторно.
-            current = as_utc(rule.next_run_at)
-            original_day = rule.start_date.day
-            last_processed: datetime | None = None
+            rule_id = rule.id
+            rule_user_id = rule.user_id
 
-            while current <= until:
-                if rule.end_date is not None and current.date() > rule.end_date:
-                    break
-
-                # Параметр from ограничивает ручной диапазон запуска.
-                if date_from is not None and current < date_from:
-                    last_processed = current
-                    current = next_run(
-                        rule.kind,
-                        current,
-                        interval=rule.interval,
-                        original_day=original_day,
+            try:
+                # Если правило упадёт, откатятся только его изменения.
+                async with self._session.begin_nested():
+                    rule_result = await self._generate_rule(
+                        rule,
+                        until=until,
+                        date_from=date_from,
+                        dry_run=dry_run,
                     )
-                    continue
+                    generated.extend(rule_result)
+            except Exception:
+                if not continue_on_error:
+                    raise
 
-                execution = RecurringExecution(
-                    id=uuid4(),
-                    rule_id=rule.id,
-                    user_id=rule.user_id,
-                    period_date=current.date(),
-                    operation_id=None,
+                logger.exception(
+                    "Recurring rule generation failed: rule_id=%s user_id=%s",
+                    rule_id,
+                    rule_user_id,
                 )
 
-                if dry_run:
-                    # dry-run ничего не записывает и не меняет правило.
-                    existing_statement = select(RecurringExecution.id).where(
-                        RecurringExecution.rule_id == rule.id,
-                        RecurringExecution.period_date == current.date(),
-                    )
-                    existing_id = await self._session.scalar(existing_statement)
+        if not dry_run:
+            await self._session.flush()
 
-                    if existing_id is None:
-                        generated.append(execution)
+        return generated
 
-                else:
-                    inserted = False
+    async def _generate_rule(
+        self,
+        rule: RecurringRule,
+        *,
+        until: datetime,
+        date_from: datetime | None,
+        dry_run: bool,
+    ) -> list[RecurringExecution]:
+        """Обработать одно правило внутри транзакционной границы."""
 
-                    try:
-                        # SAVEPOINT откатывает только конфликтующую вставку.
-                        # Предыдущие созданные операции не теряются.
-                        async with self._session.begin_nested():
-                            self._session.add(execution)
-                            await self._session.flush()
-                            inserted = True
-                    except IntegrityError:
-                        # Другой запуск уже обработал этот период.
-                        inserted = False
+        def as_utc(value: datetime) -> datetime:
+            if value.tzinfo is None:
+                return value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
 
-                    if inserted:
-                        operation_id = await self.operation_writer(
-                            user_id=rule.user_id,
-                            category_id=rule.category_id,
-                            amount=Money.from_cents(rule.amount_cents),
-                            kind="expense",
-                            occurred_at=current,
-                            recurring_execution_id=execution.id,
-                            note=rule.note,
-                            source="recurring",
-                        )
+        generated: list[RecurringExecution] = []
+        current = as_utc(rule.next_run_at)
+        original_day = rule.start_date.day
+        last_processed: datetime | None = None
 
-                        execution.operation_id = operation_id
-                        await self._session.flush()
-                        generated.append(execution)
+        while current <= until:
+            if rule.end_date is not None and current.date() > rule.end_date:
+                break
 
-                last_processed = current
+            # from влияет только на preview. Настоящий запуск всегда
+            # выполняет полный catch-up, чтобы не потерять периоды.
+            if dry_run and date_from is not None and current < date_from:
                 current = next_run(
                     rule.kind,
                     current,
                     interval=rule.interval,
                     original_day=original_day,
                 )
+                continue
 
-            if not dry_run and last_processed is not None:
-                rule.last_run_at = last_processed
-                rule.next_run_at = current
+            execution = RecurringExecution(
+                id=uuid4(),
+                rule_id=rule.id,
+                user_id=rule.user_id,
+                period_date=current.date(),
+                operation_id=None,
+            )
 
-        if not dry_run:
-            await self._session.flush()
+            if dry_run:
+                existing_statement = select(RecurringExecution.id).where(
+                    RecurringExecution.rule_id == rule.id,
+                    RecurringExecution.period_date == current.date(),
+                )
+                existing_id = await self._session.scalar(existing_statement)
+
+                if existing_id is None:
+                    generated.append(execution)
+
+            else:
+                inserted = False
+
+                try:
+                    # Внутренний savepoint обрабатывает конкурентную
+                    # вставку той же пары rule_id + period_date.
+                    async with self._session.begin_nested():
+                        self._session.add(execution)
+                        await self._session.flush()
+                        inserted = True
+                except IntegrityError:
+                    inserted = False
+
+                if inserted:
+                    operation_id = await self.operation_writer(
+                        user_id=rule.user_id,
+                        category_id=rule.category_id,
+                        amount=Money.from_cents(rule.amount_cents),
+                        kind="expense",
+                        occurred_at=current,
+                        recurring_execution_id=execution.id,
+                        note=rule.note,
+                        source="recurring",
+                    )
+
+                    execution.operation_id = operation_id
+                    await self._session.flush()
+                    generated.append(execution)
+
+            last_processed = current
+            current = next_run(
+                rule.kind,
+                current,
+                interval=rule.interval,
+                original_day=original_day,
+            )
+
+        if not dry_run and last_processed is not None:
+            rule.last_run_at = last_processed
+            rule.next_run_at = current
 
         return generated

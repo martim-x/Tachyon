@@ -59,7 +59,10 @@ class RunRulesRequest(BaseModel):
     date_from: date | None = Field(
         default=None,
         alias="from",
-        description="Начало диапазона включительно",
+        description=(
+            "Начало диапазона предварительного просмотра. "
+            "Реальный запуск всегда выполняет полный catch-up."
+        ),
     )
     date_to: date | None = Field(
         default=None,

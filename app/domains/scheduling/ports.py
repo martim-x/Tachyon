@@ -53,8 +53,6 @@ async def create_operation_impl(
 
     repository = OperationRepository(session)
 
-    repository = OperationRepository(session)
-
     with user_scope(user_id):
         operation = await repository.create(
             category_id=category_id,
