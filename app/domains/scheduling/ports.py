@@ -1,18 +1,21 @@
-"""Порт для создания операций из scheduling (docs/02 §Ports).
+"""Порт создания операций из scheduling.
 
-Планировщик не импортирует ledger напрямую — зависит от этого протокола.
+Scheduling зависит от интерфейса OperationWriter и не импортирует ledger
+в бизнес-логике. Конкретная реализация подключается на уровне приложения.
 """
 
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.money import Money
+from app.core.user_context import user_scope
 
 
 class OperationWriter(Protocol):
-    """Интерфейс для создания операции повторяющимся правилом."""
+    """Создаёт операцию для выполнения повторяющегося правила."""
 
     async def __call__(
         self,
@@ -22,39 +25,45 @@ class OperationWriter(Protocol):
         amount: Money,
         kind: str,
         occurred_at: datetime,
+        recurring_execution_id: UUID,
         note: str | None = None,
         source: str = "recurring",
-    ) -> None: ...
-
-
-OperationWriterFn = Callable[
-    [UUID, UUID, Money, str, datetime, str | None, str],
-    None,
-]
+    ) -> UUID:
+        """Вернуть UUID созданной операции."""
+        ...
 
 
 async def create_operation_impl(
-    session,
+    session: AsyncSession,
     *,
     user_id: UUID,
     category_id: UUID,
     amount: Money,
     kind: str,
     occurred_at: datetime,
+    recurring_execution_id: UUID,
     note: str | None = None,
     source: str = "recurring",
-) -> None:
-    """Реализация по умолчанию через ledger repository (для тестов/дефолта)."""
+) -> UUID:
+    """Реализация порта через репозиторий домена ledger."""
+
+    # Локальный импорт сохраняет направление зависимости:
+    # scheduling знает только порт, а не реализацию ledger.
     from app.domains.ledger.repository import OperationRepository
 
-    repo = OperationRepository(session)
-    fields: dict = {
-        "user_id": user_id,
-        "category_id": category_id,
-        "kind": kind,
-        "note": note,
-        "source": source,
-    }
-    if occurred_at is not None:
-        fields["occurred_at"] = occurred_at.astimezone(UTC)
-    await repo.create(amount=amount, **fields)
+    repository = OperationRepository(session)
+
+    repository = OperationRepository(session)
+
+    with user_scope(user_id):
+        operation = await repository.create(
+            category_id=category_id,
+            amount=amount,
+            kind=kind,
+            occurred_at=occurred_at.astimezone(UTC),
+            recurring_execution_id=recurring_execution_id,
+            note=note,
+            source=source,
+        )
+
+    return operation.id

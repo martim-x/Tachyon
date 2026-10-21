@@ -1,10 +1,9 @@
 """API повторяющихся операций: CRUD правил, пауза/актив, генерация (docs/03 §S4.2)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from uuid import UUID
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel
 
 from app.domains.scheduling.models import RecurringRule
 from app.domains.scheduling.schemas import (
@@ -12,6 +11,7 @@ from app.domains.scheduling.schemas import (
     RecurringRuleCreate,
     RecurringRuleDTO,
     RecurringRuleUpdate,
+    RunRulesRequest,
 )
 from app.domains.scheduling.service import RecurringService
 from app.interface.api.deps import CurrentUser, SessionDep
@@ -90,21 +90,37 @@ async def delete_rule(
     await service.delete_rule(str(rule_id), str(_current_user.id))
 
 
-class RunRulesRequest(BaseModel):
-    until: datetime | None = None
-    dry_run: bool = False
-
-
-@router.post("/run", response_model=list[RecurringExecutionDTO])
+@router.post(
+    "/run",
+    response_model=list[RecurringExecutionDTO],
+    summary="Запустить генерацию повторяющихся операций",
+    description=(
+        "Создаёт операции за указанный диапазон. "
+        "При dry_run=true изменения в базу данных не записываются."
+    ),
+)
 async def run_rules(
     payload: RunRulesRequest,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> list[RecurringExecutionDTO]:
+    date_from = (
+        datetime.combine(payload.date_from, time.min, tzinfo=UTC)
+        if payload.date_from is not None
+        else None
+    )
+    date_to = (
+        datetime.combine(payload.date_to, time.max, tzinfo=UTC)
+        if payload.date_to is not None
+        else None
+    )
+
     service = RecurringService(session)
     executions = await service.generate_due_operations(
-        user_id=str(_current_user.id),
-        until=payload.until,
+        user_id=_current_user.id,
+        until=date_to,
+        date_from=date_from,
         dry_run=payload.dry_run,
     )
-    return [RecurringExecutionDTO.model_validate(e) for e in executions]
+
+    return [RecurringExecutionDTO.model_validate(execution) for execution in executions]
