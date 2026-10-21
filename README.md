@@ -27,7 +27,7 @@
 | Запуск | uvicorn |
 
 Зависимости и версии описаны в `pyproject.toml`; `requirements.txt` собран
-из него (`uv pip compile pyproject.toml --extra dev`) и используется для
+из него (`uv pip compile pyproject.toml --extra dev --universal`) и используется для
 установки локально и в CI.
 
 ## Запуск с нуля
