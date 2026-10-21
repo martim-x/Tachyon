@@ -32,7 +32,6 @@ async def session_scope(
             await session.rollback()
             raise
 
-
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with session_scope() as session:
         yield session

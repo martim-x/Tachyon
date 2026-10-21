@@ -4,11 +4,12 @@ from http import HTTPStatus
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Column, Date, Integer, String, UniqueConstraint, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Column, Date, Integer, String, UniqueConstraint, select
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 
-from app.core.persistence import get_session as real_get_session
 from app.main import app
+from app.core.persistence.session import get_session
 
 TestBase = declarative_base()
 
@@ -22,25 +23,35 @@ class BudgetLimitTestModel(TestBase):
     __table_args__ = (UniqueConstraint('user_id', 'category_id', 'month', name = 'uq_budget_limit_'
                                                                                  'user_category_month'),)
 
-engine = create_engine('sqlite:///./test_budget.db', connect_args={'check_same_thread': False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_async_engine('sqlite+aiosqlite:///./test_budget.db', echo=False)
+async_session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 @pytest.fixture(scope='function')
-def db():
-    TestBase.metadata.create_all(bind=engine)
-    s = SessionLocal()
-    try:
-        yield s
-    finally:
-        s.close()
-        TestBase.metadata.drop_all(bind=engine)
+async def db():
+    async with engine.begin() as conn:
+        await conn.run_sync(TestBase.metadata.create_all)
+
+    async with async_session_maker() as session:
+        try:
+            yield session
+        finally:
+            async with engine.begin() as conn:
+                await conn.run_sync(TestBase.metadata.drop_all)
 
 @pytest.fixture
 def client(db):
-    def override():
+    from contextlib import asynccontextmanager
+    from collections.abc import AsyncIterator
+
+    @asynccontextmanager
+    async def override_get_session() -> AsyncIterator[AsyncSession]:
         yield db
-    app.dependency_overrides[real_get_session] = override
-    yield TestClient(app)
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    with TestClient(app) as client:
+        yield client
+
     app.dependency_overrides.clear()
 
 @pytest.fixture
