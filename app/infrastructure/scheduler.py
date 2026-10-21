@@ -7,7 +7,9 @@
 import logging
 from collections.abc import Callable
 
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.background import (  # type: ignore[import-untyped]
+    BackgroundScheduler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class OperationScheduler:
     @property
     def running(self) -> bool:
         """Показывает, запущен ли фоновый планировщик."""
-        return self._scheduler.running
+        return bool(self._scheduler.running)
 
     def start(self) -> None:
         """Запустить планировщик, если он ещё не запущен."""
