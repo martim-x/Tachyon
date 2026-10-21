@@ -160,8 +160,10 @@ cp .env.example .env          # в worktree нет .env, без него import 
 python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
 ```
 
-Версия Python — 3.11 или 3.12. На 3.9 проект не поднимается: в `pyproject.toml`
-`requires-python = ">=3.11"`.
+Версия Python — 3.11 или 3.12. На 3.9 проект не ставится: pip отклоняет его
+с ошибкой `requires a different Python: 3.9.6 not in '>=3.11'` (в
+`pyproject.toml` `requires-python = ">=3.11"`), а без fastapi не поднимается и
+`import app.main`.
 
 **Полный гейт перед push — все семь команд должны быть зелёными:**
 
