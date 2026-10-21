@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Kind = Literal["daily", "weekly", "monthly"]
 
@@ -51,3 +51,47 @@ class RecurringExecutionDTO(BaseModel):
     operation_id: UUID | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RunRulesRequest(BaseModel):
+    """Диапазон ручного запуска повторяющихся правил."""
+
+    date_from: date | None = Field(
+        default=None,
+        alias="from",
+        description=(
+            "Начало диапазона предварительного просмотра. "
+            "Реальный запуск всегда выполняет полный catch-up."
+        ),
+    )
+    date_to: date | None = Field(
+        default=None,
+        alias="to",
+        description="Конец диапазона включительно",
+    )
+    dry_run: bool = Field(
+        default=False,
+        description="Только показать результат без записи в БД",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "from": "2026-10-01",
+                "to": "2026-10-31",
+                "dry_run": True,
+            }
+        },
+    )
+
+    @model_validator(mode="after")
+    def validate_period(self) -> "RunRulesRequest":
+        if (
+            self.date_from is not None
+            and self.date_to is not None
+            and self.date_from > self.date_to
+        ):
+            raise ValueError("from не может быть позже to")
+
+        return self

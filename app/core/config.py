@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     token_ttl: int = Field(default=60, gt=0)
     log_level: str = "INFO"
     scheduler_enabled: bool = False
-
+    scheduler_interval_seconds: int = 60
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
