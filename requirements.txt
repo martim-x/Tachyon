@@ -56,6 +56,8 @@ idna==3.20
     #   httpx
 iniconfig==2.3.1
     # via pytest
+jinja2==3.1.6
+    # via tachyon (pyproject.toml)
 librt==0.16.0 ; platform_python_implementation != 'PyPy'
     # via mypy
 mako==1.4.3
@@ -63,7 +65,9 @@ mako==1.4.3
 markdown-it-py==4.2.0
     # via rich
 markupsafe==3.0.4
-    # via mako
+    # via
+    #   jinja2
+    #   mako
 mdurl==0.1.2
     # via markdown-it-py
 mypy==1.20.2
