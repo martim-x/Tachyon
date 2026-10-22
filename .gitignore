@@ -23,5 +23,8 @@ logs/
 # IDE
 .idea/
 .vscode/
+# Test artifacts
+pytest_output.txt
 
-Tachyon/
+# CI artifacts
+bandit-report.json

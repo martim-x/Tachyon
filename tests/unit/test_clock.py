@@ -2,7 +2,11 @@
 
 from datetime import UTC, date, datetime, timedelta
 
+import pytest
+
 from app.core.clock import FrozenClock, SystemClock
+
+pytestmark = pytest.mark.unit
 
 
 def test_frozen_clock_keeps_its_day() -> None:

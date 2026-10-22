@@ -27,8 +27,11 @@
 | Запуск | uvicorn |
 
 Зависимости и версии описаны в `pyproject.toml`; `requirements.txt` собран
-из него (`uv pip compile pyproject.toml --extra dev`) и используется для
-установки локально и в CI.
+из него (`uv pip compile pyproject.toml --extra dev --universal`) и используется
+для ручной установки локально. CI ставит зависимости из `pyproject.toml`
+через `pip install -e ".[dev]"`, поэтому `requirements.txt` нужно
+пересобирать при изменении зависимостей — иначе сценарий «запуск с нуля»
+разойдётся с пайплайном.
 
 ## Запуск с нуля
 
@@ -165,3 +168,49 @@ Swagger и ReDoc. Тесты защитного контура — изоляц�
 
 Домены внутри каталога `docs/` описывают один и тот же проект. Если меняется
 бэклог — поправь оценки в `03`, приоритеты в `04`, критерии приёмки в `06`.
+
+## 🛠 Разработка
+
+### Pre-commit хуки
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### Линтеры (в CI — отдельными стадиями)
+```bash
+# Стиль и импорты
+ruff check .
+
+# Типы
+mypy app
+
+# Безопасность
+bandit -r app -c pyproject.toml -ll -iii
+```
+
+### Тесты
+```bash
+# Unit (быстро, без БД)
+pytest -q -m unit
+
+# Integration (с БД, миграциями)
+pytest -q -m integration
+
+# E2E (сквозные)
+pytest -q -m e2e
+
+# Все
+pytest -q
+```
+
+### CI Pipeline
+| Stage | Job | Назначение |
+|-------|-----|------------|
+| lint-style | ruff | Стиль, импорты, ошибки |
+| lint-types | mypy | Статические типы |
+| lint-security | bandit | Security audit |
+| test-unit | pytest -m unit | Быстрые тесты |
+| test-integration | pytest -m integration | Интеграционные тесты |
+| test-e2e | pytest -m e2e | Сквозные сценарии |
+| db | alembic | Миграции up/down/up |

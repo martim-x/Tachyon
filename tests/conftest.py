@@ -260,9 +260,7 @@ class RuleFactory:
                 kind=kind,
                 amount_cents=Money(amount).to_cents(),
                 start_date=start_date,
-                next_run_at=datetime(
-                    start_date.year, start_date.month, start_date.day, tzinfo=UTC
-                ),
+                next_run_at=datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC),
             )
             session.add(rule)
             await session.commit()

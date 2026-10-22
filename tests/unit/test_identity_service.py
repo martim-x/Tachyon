@@ -11,6 +11,8 @@ from app.domains.identity.service import (
     verify_password,
 )
 
+pytestmark = pytest.mark.unit
+
 
 def test_hash_password_uses_random_salt() -> None:
     password = "strong-password"

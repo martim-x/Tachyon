@@ -1,6 +1,6 @@
 """HTTP-интерфейс операций: разбор запроса, вызов сервиса, сериализация (docs/02)."""
 
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
@@ -8,7 +8,10 @@ from fastapi import APIRouter, Query, status
 from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import OperationRepository
 from app.domains.ledger.schemas import (
+    CategoryCreate,
     CategoryDTO,
+    CategoryUpdate,
+    Kind,
     OperationCreate,
     OperationDTO,
     OperationListQuery,
@@ -28,7 +31,7 @@ def _operation_dto(operation: Operation) -> OperationDTO:
         user_id=operation.user_id,
         category_id=operation.category_id,
         amount=OperationRepository.to_money(operation).amount,
-        kind=operation.kind,
+        kind=cast(Kind, operation.kind),
         occurred_at=operation.occurred_at,
         note=operation.note,
         source=operation.source,
@@ -96,14 +99,13 @@ async def patch_operation(
     return _operation_dto(operation)
 
 
-@router.delete("/operations/{operation_id}", response_model=OperationDTO)
+@router.delete("/operations/{operation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_operation(
     operation_id: UUID,
     _current_user: CurrentUser,
     session: SessionDep,
-) -> OperationDTO:
-    operation = await OperationService(session).delete(operation_id)
-    return _operation_dto(operation)
+) -> None:
+    await OperationService(session).delete(operation_id)
 
 
 @router.get("/categories", response_model=list[CategoryDTO], tags=["Категории"])
@@ -113,3 +115,60 @@ async def list_categories(
 ) -> list[CategoryDTO]:
     categories = await CategoryService(session).list()
     return [_category_dto(category) for category in categories]
+
+
+@router.post(
+    "/categories",
+    response_model=CategoryDTO,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Категории"],
+)
+async def create_category(
+    payload: CategoryCreate,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> CategoryDTO:
+    category = await CategoryService(session).create(payload)
+    return _category_dto(category)
+
+
+@router.get(
+    "/categories/{category_id}",
+    response_model=CategoryDTO,
+    tags=["Категории"],
+)
+async def get_category(
+    category_id: UUID,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> CategoryDTO:
+    category = await CategoryService(session).get(category_id)
+    return _category_dto(category)
+
+
+@router.patch(
+    "/categories/{category_id}",
+    response_model=CategoryDTO,
+    tags=["Категории"],
+)
+async def patch_category(
+    category_id: UUID,
+    payload: CategoryUpdate,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> CategoryDTO:
+    category = await CategoryService(session).update(category_id, payload)
+    return _category_dto(category)
+
+
+@router.delete(
+    "/categories/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Категории"],
+)
+async def delete_category(
+    category_id: UUID,
+    _current_user: CurrentUser,
+    session: SessionDep,
+) -> None:
+    await CategoryService(session).delete(category_id)

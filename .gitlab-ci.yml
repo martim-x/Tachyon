@@ -1,17 +1,84 @@
 image: "python:3.12-slim"
 
+variables:
+  # Тестовое значение только для CI; реальный ключ приходит из окружения деплоя.
+  SECRET_KEY: "ci-test-secret-key-0123456789abcdef"
+
 stages:
-  - test
+  - lint-style
+  - lint-types
+  - lint-security
+  - test-unit
+  - test-integration
+  - test-e2e
+  - db
 
-tests:
-  stage: test
-
+# ─── LINTERS (параллельно) ───
+lint-style:
+  stage: lint-style
   before_script:
-    - python -m pip install -r requirements.txt
-    - cp .env.example .env
-
+    - python -m pip install -e ".[dev]"
   script:
     - python -m ruff check .
-    - python -m pytest -q
+  allow_failure: false
+
+lint-types:
+  stage: lint-types
+  before_script:
+    - python -m pip install -e ".[dev]"
+  script:
+    - python -m mypy app
+  allow_failure: false
+
+lint-security:
+  stage: lint-security
+  before_script:
+    - python -m pip install -e ".[dev]"
+  script:
+    - python -m bandit -r app -c pyproject.toml -ll -iii -f json -o bandit-report.json
+  artifacts:
+    paths:
+      - bandit-report.json
+    when: always
+    expire_in: 1 week
+  allow_failure: false
+
+# ─── TESTS ───
+test-unit:
+  stage: test-unit
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "unit"
+  allow_failure: false
+
+test-integration:
+  stage: test-integration
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "integration"
+  allow_failure: false
+
+test-e2e:
+  stage: test-e2e
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q -m "e2e"
+  allow_failure: false
+
+# ─── DB ───
+db:
+  stage: db
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
     - alembic upgrade head
     - alembic downgrade base
+    - alembic upgrade head
+  allow_failure: false

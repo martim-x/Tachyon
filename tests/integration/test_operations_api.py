@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.domains.ledger.models import Operation
 from tests.conftest import ApiClientFactory, CategoryFactory, UserFactory
 
+pytestmark = pytest.mark.integration
+
 
 async def create_operation(
     client: AsyncClient,
@@ -247,9 +249,7 @@ async def test_operations_filters_period_category_and_kind(
         amount="50.00",
         kind="income",
     )
-    await create_operation(
-        client, groceries.id, occurred_at="2026-09-15T10:00:00Z", amount="5.00"
-    )
+    await create_operation(client, groceries.id, occurred_at="2026-09-15T10:00:00Z", amount="5.00")
 
     period = (
         await client.get(
@@ -316,9 +316,7 @@ async def test_operations_patch_updates_amount_and_note(
     alice, alice_token = await user_factory("alice@test.io")
     client = api_client(token=alice_token)
     category = await category_factory(alice)
-    created = await create_operation(
-        client, category.id, occurred_at="2026-10-05T10:00:00Z"
-    )
+    created = await create_operation(client, category.id, occurred_at="2026-10-05T10:00:00Z")
 
     body = (
         await client.patch(
@@ -407,9 +405,7 @@ async def test_operations_normalize_occurred_at_offset_to_utc(
     client = api_client(token=alice_token)
     category = await category_factory(alice)
 
-    created = await create_operation(
-        client, category.id, occurred_at="2026-10-05T13:00:00+03:00"
-    )
+    created = await create_operation(client, category.id, occurred_at="2026-10-05T13:00:00+03:00")
 
     assert created["occurred_at"].startswith("2026-10-05T10:00:00")
 
@@ -455,9 +451,7 @@ async def test_operations_patch_foreign_returns_404_isolation(
     )
     assert response.status_code == 404
 
-    untouched = (
-        await alice_client.get(f"/api/v1/operations/{created['id']}")
-    ).json()
+    untouched = (await alice_client.get(f"/api/v1/operations/{created['id']}")).json()
     assert untouched["note"] != "взломано"
 
 
@@ -479,9 +473,7 @@ async def test_operations_patch_foreign_category_isolation(
     )
     assert response.status_code == 404
 
-    untouched = (
-        await bob_client.get(f"/api/v1/operations/{created['id']}")
-    ).json()
+    untouched = (await bob_client.get(f"/api/v1/operations/{created['id']}")).json()
     assert untouched["category_id"] == str(own_category.id)
 
 
@@ -495,14 +487,10 @@ async def test_operations_delete_own_removes(
     category = await category_factory(alice)
     created = await create_operation(client, category.id)
 
-    deleted = (
-        await client.delete(f"/api/v1/operations/{created['id']}")
-    ).json()
-    assert deleted["id"] == created["id"]
+    resp = await client.delete(f"/api/v1/operations/{created['id']}")
+    assert resp.status_code == 204
 
-    assert (
-        await client.get(f"/api/v1/operations/{created['id']}")
-    ).status_code == 404
+    assert (await client.get(f"/api/v1/operations/{created['id']}")).status_code == 404
     listing = (await client.get("/api/v1/operations")).json()
     assert listing["total"] == 0
 
@@ -538,6 +526,30 @@ async def test_operations_empty_list_returns_zero_total(
 
     categories = (await client.get("/api/v1/categories")).json()
     assert categories == []
+
+
+async def test_categories_duplicate_name_returns_conflict(
+    api_client: ApiClientFactory,
+    user_factory: UserFactory,
+) -> None:
+    """Повтор имени категории у того же пользователя — 409, а не 500 (ix_categories_user_name)."""
+    _, alice_token = await user_factory("alice@test.io")
+    client = api_client(token=alice_token)
+    payload = {"name": "Продукты", "kind": "expense"}
+
+    first = await client.post("/api/v1/categories", json=payload)
+    assert first.status_code == 201, first.text
+
+    second = await client.post("/api/v1/categories", json=payload)
+    assert second.status_code == 409, second.text
+    body = second.json()
+    assert body["error"]["code"] == "CONFLICT"
+    assert body["error"]["message"] == "Категория с таким именем уже существует"
+
+    # Сессия после отката рабочая: список по-прежнему отдаёт ровно одну категорию.
+    listed = await client.get("/api/v1/categories")
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
 
 
 async def test_operations_require_authentication(api_client: ApiClientFactory) -> None:

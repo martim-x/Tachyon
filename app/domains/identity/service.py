@@ -84,7 +84,7 @@ class IdentityService:
         normalized_email = email.lower()
 
         if await self._repository.get_by_email(normalized_email) is not None:
-            raise Conflict("Email уже занят")
+            raise Conflict("Email уже занят", safe_message="Email уже занят")
 
         password_hash = await run_in_threadpool(hash_password, password)
 
