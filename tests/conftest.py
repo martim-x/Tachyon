@@ -323,7 +323,6 @@ async def api_client(
 
     application.dependency_overrides[get_session] = override_get_session
     application.dependency_overrides[get_clock] = lambda: frozen_clock
-
     transport = ASGITransport(app=application)
     created: list[AsyncClient] = []
 

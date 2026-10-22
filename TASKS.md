@@ -63,6 +63,7 @@
 - 2026-10-21 23:15 — + в работе (Hermes, основной агент), ветка `feature/reporting-aggregation`
 - 2026-10-21 23:57 — готов к ревью (!24)
 - 2026-10-22 00:14 — готов к ревью (!24), дописаны FR-1 и FR-5: прогноз в monthly и GET /api/v1/forecast
+- 2026-10-22 23:38 — готов к ревью (!26): rebase на свежий main, замечания Duo исправлены (fixture, MIN/MAX_YEAR, дубли проверки периода, TypedDict ForecastData)
 
 #### TT-27
 
