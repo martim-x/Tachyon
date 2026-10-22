@@ -2,6 +2,10 @@
 
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 APP_ROOT = Path(__file__).resolve().parents[2] / "app"
 
 

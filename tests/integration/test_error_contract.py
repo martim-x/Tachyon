@@ -2,13 +2,11 @@
 
 from uuid import uuid4
 
-from tests.conftest import (
-    ApiClientFactory,
-    CategoryFactory,
-    LoggedInClient,
-    OperationFactory,
-)
+import pytest
 
+from tests.conftest import ApiClientFactory, CategoryFactory, LoggedInClient, OperationFactory
+
+pytestmark = pytest.mark.integration
 
 async def test_validation_error_has_unified_contract(
     api_client_a: LoggedInClient,

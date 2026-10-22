@@ -1,0 +1,15 @@
+"""Единая точка подключения API-роутеров."""
+
+from fastapi import APIRouter
+
+from app.domains.identity.api import router as identity_router
+from app.domains.ledger.api import router as ledger_router
+from app.domains.reporting.api import router as reporting_router
+from app.domains.scheduling.api import router as scheduling_router
+
+api_router = APIRouter()
+
+api_router.include_router(identity_router)
+api_router.include_router(ledger_router)
+api_router.include_router(scheduling_router)
+api_router.include_router(reporting_router)

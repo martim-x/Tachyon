@@ -15,26 +15,8 @@ from app.core.errors import (
     NotFound,
     PermissionDenied,
 )
-from app.core.errors import (
-    ValidationError as DomainValidationError,
-)
-from app.interface.api.schemas import ErrorContent, ErrorResponse
-
-
-def error_body(
-    code: str,
-    message: str,
-    detail: list[dict[str, str]] | None = None,
-) -> dict:
-    """Сформировать единственное тело ошибки для всего API."""
-    response = ErrorResponse(
-        error=ErrorContent(
-            code=code,
-            message=message,
-            detail=detail or [],
-        )
-    )
-    return response.model_dump()
+from app.core.errors import ValidationError as DomainValidationError
+from app.interface.api.schemas import error_body
 
 
 async def not_found_handler(_request: Request, _exc: NotFound) -> JSONResponse:
@@ -66,10 +48,11 @@ async def authentication_failed_handler(
     )
 
 
-async def conflict_handler(_request: Request, _exc: Conflict) -> JSONResponse:
+async def conflict_handler(_request: Request, exc: Conflict) -> JSONResponse:
     # Текст исключения не отдаём клиенту: он может содержать email или детали БД.
+    # Клиенту уходит только safe_message — явно безопасная формулировка домена.
     return JSONResponse(
-        error_body("CONFLICT", "Email уже занят"),
+        error_body("CONFLICT", exc.safe_message),
         status_code=409,
     )
 
@@ -124,11 +107,18 @@ async def validation_error_handler(
 
 
 def register_exception_handlers(application: FastAPI) -> None:
-    """Подключить обработчики к приложению."""
-    application.add_exception_handler(NotFound, not_found_handler)
-    application.add_exception_handler(PermissionDenied, permission_denied_handler)
-    application.add_exception_handler(AuthenticationFailed, authentication_failed_handler)
-    application.add_exception_handler(Conflict, conflict_handler)
-    application.add_exception_handler(DomainValidationError, domain_validation_error_handler)
-    application.add_exception_handler(LimitExceeded, limit_exceeded_handler)
-    application.add_exception_handler(RequestValidationError, validation_error_handler)
+    """Подключить обработчики к приложению.
+
+    starlette типизирует handler как Callable[[Request, Exception], ...],
+    хотя фактически вызывает его только с зарегистрированным классом
+    исключения. Обработчики ниже точнее этой сигнатуры, поэтому mypy
+    видит несовместимость параметров; каждый ignore[arg-type] покрывает
+    ровно один вызов регистрации.
+    """
+    application.add_exception_handler(NotFound, not_found_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(PermissionDenied, permission_denied_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(AuthenticationFailed, authentication_failed_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(Conflict, conflict_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(DomainValidationError, domain_validation_error_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(LimitExceeded, limit_exceeded_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]

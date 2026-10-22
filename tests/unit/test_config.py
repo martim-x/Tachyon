@@ -3,6 +3,8 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 
+pytestmark = pytest.mark.unit
+
 
 def test_settings_accept_valid_values() -> None:
     settings = Settings(

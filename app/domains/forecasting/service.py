@@ -67,9 +67,7 @@ def forecast_month(
         days_elapsed=elapsed,
         recent_window_total=recent_window_total,
     )
-    projected_total = money(
-        spent_to_date + daily_rate * days_remaining + extra_known_amounts
-    )
+    projected_total = money(spent_to_date + daily_rate * days_remaining + extra_known_amounts)
     return {
         "year": year,
         "month": month,

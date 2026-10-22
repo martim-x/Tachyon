@@ -5,6 +5,8 @@ import pytest
 from app.core.errors import Conflict
 from app.domains.identity.repository import UserRepository
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_user_repository_creates_and_finds_user(session) -> None:

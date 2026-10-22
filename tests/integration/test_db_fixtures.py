@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,15 +17,14 @@ from tests.conftest import (
     UserFactory,
 )
 
+pytestmark = pytest.mark.integration
 
 async def test_db_session_schema_comes_from_migrations(
     db_session: async_sessionmaker[AsyncSession],
 ) -> None:
     """FR-1: схема тестовой БД - результат `alembic upgrade head`, не create_all."""
     async with db_session() as session:
-        result = await session.execute(
-            text("SELECT name FROM sqlite_master WHERE type = 'table'")
-        )
+        result = await session.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))
         names = {row[0] for row in result}
 
     assert "alembic_version" in names
@@ -36,9 +36,7 @@ async def test_clean_db_builds_schema_from_metadata(
 ) -> None:
     """S1.4: create_all из моделей даёт полный набор таблиц - без alembic_version."""
     async with clean_db() as session:
-        result = await session.execute(
-            text("SELECT name FROM sqlite_master WHERE type = 'table'")
-        )
+        result = await session.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))
         names = {row[0] for row in result}
 
     assert set(Base.metadata.tables) <= names

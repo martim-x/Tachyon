@@ -1,12 +1,7 @@
 from fastapi import APIRouter, status
 
 from app.domains.identity.repository import UserRepository
-from app.domains.identity.schemas import (
-    LoginRequest,
-    RegisterRequest,
-    TokenResponse,
-    UserResponse,
-)
+from app.domains.identity.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from app.domains.identity.service import IdentityService, create_access_token
 from app.interface.api.deps import CurrentUser, SessionDep
 

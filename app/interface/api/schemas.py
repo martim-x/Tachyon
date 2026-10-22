@@ -31,3 +31,15 @@ class ErrorResponse(BaseModel):
             }
         }
     )
+
+
+def error_body(
+    code: str,
+    message: str,
+    detail: list[dict[str, str]] | None = None,
+) -> dict:
+    """Сформировать единственное тело ошибки для всего API."""
+    response = ErrorResponse.model_validate(
+        {"error": {"code": code, "message": message, "detail": detail or []}}
+    )
+    return response.model_dump()

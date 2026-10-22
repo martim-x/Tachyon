@@ -6,6 +6,8 @@ import pytest
 
 from app.core.money import Money
 
+pytestmark = pytest.mark.unit
+
 
 def test_money_quantizes_to_two_places() -> None:
     assert Money("10.0") == Money("10.00")

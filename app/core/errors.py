@@ -18,7 +18,20 @@ class AuthenticationFailed(DomainError):
 
 
 class Conflict(DomainError):
-    """Ресурс уже существует и не может быть создан повторно."""
+    """Ресурс уже существует и не может быть создан повторно.
+
+    message — внутренний текст для логов; safe_message — единственная
+    формулировка, которую обработчик отдаёт клиенту (без email и деталей БД).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        safe_message: str = "Ресурс уже существует",
+    ) -> None:
+        super().__init__(message)
+        self.safe_message = safe_message
 
 
 class ValidationError(DomainError):

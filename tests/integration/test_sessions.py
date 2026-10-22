@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.persistence import session_scope
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_parallel_requests_use_different_sessions(tmp_path) -> None:
