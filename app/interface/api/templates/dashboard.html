@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — Tachyon{% endblock %}
+{% block content %}
+<section aria-label="Сводка месяца">
+  <h1>Дашборд</h1>
+  <p class="month-label">Сводка за {{ report_month }}</p>
+  <div class="cards">
+    <article class="card">
+      <h2>Доходы</h2><p class="amount-income">{{ summary.income | money }}</p>
+    </article>
+    <article class="card">
+      <h2>Расходы</h2><p class="amount-expense">{{ summary.expense | money }}</p>
+    </article>
+    <article class="card">
+      <h2>Остаток</h2><p>{{ summary.balance | money }}</p>
+    </article>
+    <article class="card">
+      <h2>Прогноз на месяц</h2><p>{{ summary.forecast | money }}</p>
+    </article>
+  </div>
+</section>
+
+{#
+  Зона задачи TT-29 (диаграмма расходов по категориям, TASKS.md).
+  Компонент рендерится из отдельного файла templates/dashboard/chart.html:
+  этот файл создаёт TT-29 своими коммитами и не трогает routers.py
+  (разграничение зон задаёт TASKS.md). Пока файла нет, include молчит
+  — страница отдаётся без диаграммы.
+  Данные для диаграммы: GET /api/v1/reports/by-category.
+#}
+{% include "dashboard/chart.html" ignore missing %}
+
+<section aria-label="Последние операции">
+  <h2>Последние операции</h2>
+  <form class="filters" method="get" action="/dashboard">
+    <label>С
+      <input type="date" name="from" value="{{ filters.date_from }}">
+    </label>
+    <label>По
+      <input type="date" name="to" value="{{ filters.date_to }}">
+    </label>
+    <label>Категория
+      <select name="category_id">
+        <option value="">Все категории</option>
+        {% for category in categories %}
+          <option value="{{ category.id }}"
+            {% if filters.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Тип
+      <select name="type">
+        <option value="" {% if not filters.kind %}selected{% endif %}>Все операции</option>
+        <option value="income" {% if filters.kind == "income" %}selected{% endif %}>Доходы</option>
+        <option value="expense" {% if filters.kind == "expense" %}selected{% endif %}>Расходы</option>
+      </select>
+    </label>
+    <button type="submit" class="btn">Применить</button>
+    <a class="btn link" href="/dashboard">Сбросить</a>
+  </form>
+
+  <p class="loading" data-loading hidden>Загрузка данных…</p>
+
+  <div class="table-wrap">
+  {% if operations %}
+    <table>
+      <thead>
+        <tr><th>Дата</th><th>Категория</th><th>Тип</th><th>Сумма</th><th>Комментарий</th></tr>
+      </thead>
+      <tbody>
+      {% for operation in operations %}
+        <tr>
+          <td>{{ operation.occurred_at }}</td>
+          <td>{{ operation.category }}</td>
+          <td><span class="badge {{ operation.kind }}">{{ operation.kind_label }}</span></td>
+          <td class="amount-{{ operation.kind }}">{{ operation.amount | money }}</td>
+          <td>{{ operation.note }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty-state">Операций пока нет. Добавьте первую операцию
+      через <code>POST /api/v1/operations</code> или измените фильтры —
+      сводка и таблица заполнятся сами.</p>
+  {% endif %}
+  </div>
+  <p class="meta">Всего операций за выбранный период: {{ total }}</p>
+</section>
+
+<script>
+  // docs/03 §S8.1 T3: индикатор загрузки на время запроса с фильтрами.
+  const filters = document.querySelector(".filters");
+  filters?.addEventListener("submit", () => {
+    const loading = document.querySelector("[data-loading]");
+    if (loading) {
+      loading.hidden = false;
+    }
+  });
+</script>
+{% endblock %}

@@ -8,6 +8,7 @@ from app.domains.ledger.api import router as ledger_router
 from app.domains.reporting.api import forecast_router as reporting_forecast_router
 from app.domains.reporting.api import router as reporting_router
 from app.domains.scheduling.api import router as scheduling_router
+from app.interface.api.pages import router as dashboard_pages_router
 
 api_router = APIRouter()
 
@@ -17,3 +18,4 @@ api_router.include_router(ledger_router)
 api_router.include_router(scheduling_router)
 api_router.include_router(reporting_router)
 api_router.include_router(reporting_forecast_router)
+api_router.include_router(dashboard_pages_router)
