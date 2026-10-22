@@ -38,6 +38,7 @@ from app.domains.identity.service import create_access_token
 from app.domains.ledger.models import Category, Operation
 from app.domains.scheduling.models import RecurringRule
 from app.interface.api.app import create_app
+from app.interface.api.deps import get_clock
 from tests.integration import factories
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -310,8 +311,10 @@ class ApiClientFactory(Protocol):
 @pytest.fixture
 async def api_client(
     db_session: async_sessionmaker[AsyncSession],
+    frozen_clock: FrozenClock,
 ) -> AsyncIterator[ApiClientFactory]:
-    """httpx-клиент поверх ASGI-приложения с тестовой БД вместо рабочей."""
+    """httpx-клиент с тестовыми БД и временем."""
+
     application = create_app()
 
     async def override_get_session() -> AsyncIterator[AsyncSession]:
@@ -319,13 +322,22 @@ async def api_client(
             yield session
 
     application.dependency_overrides[get_session] = override_get_session
+    application.dependency_overrides[get_clock] = lambda: frozen_clock
+
     transport = ASGITransport(app=application)
     created: list[AsyncClient] = []
 
-    def make_client(token: str | None = None) -> AsyncClient:
+    def make_client(
+        token: str | None = None,
+    ) -> AsyncClient:
         headers = {"Authorization": f"Bearer {token}"} if token is not None else {}
-        client = AsyncClient(transport=transport, base_url="http://test", headers=headers)
+        client = AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            headers=headers,
+        )
         created.append(client)
+
         return client
 
     yield make_client
