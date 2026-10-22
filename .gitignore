@@ -25,6 +25,7 @@ logs/
 .vscode/
 # Test artifacts
 pytest_output.txt
+test_budget_db
 
 # CI artifacts
 bandit-report.json

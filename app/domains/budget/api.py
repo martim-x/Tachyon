@@ -3,16 +3,24 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.clock import SystemClock
 from app.domains.budget.models import BudgetLimit
 from app.domains.budget.service import limit_status
 from app.domains.forecasting.service import forecast_month
 from app.domains.ledger.models import Category, Operation
-from app.interface.api.deps import CurrentUser, SessionDep
+from app.interface.api.deps import (
+    ClockDep,
+    CurrentUser,
+    SessionDep,
+)
 
 router = APIRouter(
     prefix="/api/v1/budget_limits",
@@ -32,7 +40,11 @@ def next_month(month: date) -> date:
     if month.month == 12:
         return date(month.year + 1, 1, 1)
 
-    return date(month.year, month.month + 1, 1)
+    return date(
+        month.year,
+        month.month + 1,
+        1,
+    )
 
 
 def day_start(day: date) -> datetime:
@@ -53,7 +65,10 @@ class LimitCreate(BaseModel):
 
     @field_validator("month")
     @classmethod
-    def month_starts_on_first_day(cls, value: date) -> date:
+    def month_starts_on_first_day(
+        cls,
+        value: date,
+    ) -> date:
         return normalize_month(value)
 
 
@@ -152,7 +167,7 @@ async def update_limit(
 
     if limit_amount_cents <= 0:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=(status.HTTP_422_UNPROCESSABLE_CONTENT),
             detail="Лимит должен быть больше 0",
         )
 
@@ -180,6 +195,7 @@ async def update_limit(
 async def get_statuses(
     current_user: CurrentUser,
     session: SessionDep,
+    clock: ClockDep,
 ):
     stmt = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
@@ -187,14 +203,14 @@ async def get_statuses(
     result = await session.execute(stmt)
     limits = result.scalars().all()
 
-    today = SystemClock().today()
+    today = clock.today()
     result_data = []
 
     for limit_obj in limits:
         month_start = normalize_month(limit_obj.month)
         month_after = next_month(month_start)
 
-        # Будущие операции не участвуют в факте и текущем темпе.
+        # Факт и текущий темп не учитывают будущие операции.
         if today < month_start:
             actual_period_end = month_start
         elif today < month_after:
@@ -219,18 +235,30 @@ async def get_statuses(
         limit_dec = Decimal(limit_obj.limit_amount_cents) / Decimal("100")
         spent_dec = Decimal(spent_amount_cents) / Decimal("100")
 
-        forecast_data = forecast_month(
-            spent_to_date=spent_dec,
-            year=month_start.year,
-            month=month_start.month,
-            as_of=today,
-        )
-        projected_value = forecast_data["projected_total"]
+        if today < month_start:
+            # Будущий месяц: факт и прогноз пока нулевые.
+            projected_dec = Decimal("0.00")
+        elif today >= month_after:
+            # Прошлый месяц завершён: прогноз равен факту.
+            projected_dec = spent_dec
+        else:
+            # Прогноз вычисляется только для текущего месяца.
+            forecast_data = forecast_month(
+                spent_to_date=spent_dec,
+                year=month_start.year,
+                month=month_start.month,
+                as_of=today,
+            )
+            projected_value = forecast_data["projected_total"]
 
-        if not isinstance(projected_value, Decimal):
-            raise TypeError("Прогноз должен возвращать Decimal")
+            if not isinstance(
+                projected_value,
+                Decimal,
+            ):
+                raise TypeError("Прогноз должен возвращать Decimal")
 
-        projected_dec = projected_value
+            projected_dec = projected_value
+
         projected_amount_cents = int(
             (projected_dec * Decimal("100")).quantize(
                 Decimal("1"),
@@ -257,7 +285,7 @@ async def get_statuses(
                 "category_id": limit_obj.category_id,
                 "month": month_start,
                 "limit_amount_cents": (limit_obj.limit_amount_cents),
-                "spent_amount_cents": spent_amount_cents,
+                "spent_amount_cents": (spent_amount_cents),
                 "remaining_amount_cents": max(
                     limit_obj.limit_amount_cents - spent_amount_cents,
                     0,

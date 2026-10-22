@@ -202,14 +202,9 @@ async def test_status_uses_real_spending_and_forecast(
     api_client_a,
     category_factory,
     operation_factory,
-    monkeypatch,
 ):
     # Фиксируем текущую дату, чтобы результат прогноза
     # не зависел от дня запуска теста.
-    monkeypatch.setattr(
-        "app.domains.budget.api.SystemClock.today",
-        lambda _self: date(2026, 10, 15),
-    )
 
     category = await category_factory(
         api_client_a.user,
@@ -274,3 +269,101 @@ async def test_status_uses_real_spending_and_forecast(
     # 700 / 15 прошедших дней * 31 день = 1446.67.
     assert status_data["projected_amount_cents"] == 144_667
     assert status_data["status"] == "EXCEEDED_PROJECTED"
+
+
+async def test_past_month_projection_equals_final_spending(
+    api_client_a,
+    category_factory,
+    operation_factory,
+):
+    category = await category_factory(
+        api_client_a.user,
+        name="Сентябрьские расходы",
+        kind="expense",
+    )
+
+    created = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": "2026-09-15",
+            "limit_amount_cents": 1000,
+        },
+    )
+    assert created.status_code == HTTPStatus.CREATED, created.text
+
+    await operation_factory(
+        api_client_a.user,
+        Decimal("7.00"),
+        category=category,
+        kind="expense",
+        occurred_at=datetime(
+            2026,
+            9,
+            10,
+            12,
+            tzinfo=UTC,
+        ),
+    )
+
+    response = await api_client_a.client.get(f"{URL}/status")
+
+    assert response.status_code == HTTPStatus.OK, response.text
+
+    status_data = response.json()[0]
+
+    assert status_data["month"] == "2026-09-01"
+    assert status_data["spent_amount_cents"] == 700
+    assert status_data["projected_amount_cents"] == 700
+    assert status_data["remaining_amount_cents"] == 300
+    assert status_data["status"] == "OK"
+
+
+async def test_future_month_has_zero_spending_and_projection(
+    api_client_a,
+    category_factory,
+    operation_factory,
+):
+    category = await category_factory(
+        api_client_a.user,
+        name="Ноябрьские расходы",
+        kind="expense",
+    )
+
+    created = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": "2026-11-20",
+            "limit_amount_cents": 1000,
+        },
+    )
+    assert created.status_code == HTTPStatus.CREATED, created.text
+
+    # Операция существует в БД, но относительно FrozenClock
+    # ноябрь ещё не наступил.
+    await operation_factory(
+        api_client_a.user,
+        Decimal("9.00"),
+        category=category,
+        kind="expense",
+        occurred_at=datetime(
+            2026,
+            11,
+            5,
+            12,
+            tzinfo=UTC,
+        ),
+    )
+
+    response = await api_client_a.client.get(f"{URL}/status")
+
+    assert response.status_code == HTTPStatus.OK, response.text
+
+    status_data = response.json()[0]
+
+    assert status_data["month"] == "2026-11-01"
+    assert status_data["spent_amount_cents"] == 0
+    assert status_data["projected_amount_cents"] == 0
+    assert status_data["remaining_amount_cents"] == 1000
+    assert status_data["status"] == "OK"
