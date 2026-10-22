@@ -1,16 +1,19 @@
 """Сервис отчётов: период, pandas-агрегация и прогноз."""
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock, SystemClock
 from app.core.errors import ValidationError
+from app.domains.forecasting.calendar_math import days_elapsed as elapsed_days
+from app.domains.forecasting.schemas import ForecastDTO
 from app.domains.forecasting.service import (
     forecast_month as calculate_forecast_month,
 )
+from app.domains.forecasting.strategies import RECENT_WINDOW, WHOLE_MONTH, PaceStrategy
 from app.domains.reporting.queries import (
     CategoryAggregate,
     ReportAggregate,
@@ -214,3 +217,75 @@ class ReportingService:
         )
 
         return [to_series_point(category) for category in aggregate.categories]
+
+    async def forecast(
+        self,
+        *,
+        month_start: date,
+        pace: PaceStrategy = WHOLE_MONTH,
+    ) -> ForecastDTO:
+        """Прогноз расходов на месяц (docs/03 §S6.5 T1, docs/06 §Формулы).
+
+        Месяц задаётся целиком: траты берутся с 1-го числа месяца по
+        отчётную дату (min(сегодня, конец месяца)). Это окно совпадает
+        с прогнозом в monthly-отчёте (NFR-3: одна функция агрегации).
+
+        Месяц, который ещё не начался — это 200 с нулями и
+        low_confidence, а не 404 (docs/06 §Нулевые траты).
+        """
+        today = self._clock.today()
+        month_last = month_end(month_start)
+        report_day = min(today, month_last)
+
+        if today < month_start:
+            spent_to_date = Decimal("0.00")
+            recent_window_total = Decimal("0.00")
+        else:
+            rows = await self._repository.period_rows(
+                date_from=month_start,
+                date_to=report_day,
+                limit_month=month_start,
+            )
+            spent_to_date = aggregate_report(rows).expense
+
+            if pace is RECENT_WINDOW:
+                days_elapsed = elapsed_days(month_start.year, month_start.month, today)
+                window_days = min(7, days_elapsed)
+                if window_days > 0:
+                    window_start = report_day - timedelta(days=window_days - 1)
+                    if window_start < month_start:
+                        window_start = month_start
+                    window_rows = await self._repository.period_rows(
+                        date_from=window_start,
+                        date_to=report_day,
+                        limit_month=month_start,
+                    )
+                    recent_window_total = aggregate_report(window_rows).expense
+                else:
+                    recent_window_total = Decimal("0.00")
+            else:
+                recent_window_total = Decimal("0.00")
+
+        data = calculate_forecast_month(
+            spent_to_date=spent_to_date,
+            year=month_start.year,
+            month=month_start.month,
+            as_of=today,
+            pace=pace,
+            recent_window_total=recent_window_total,
+        )
+
+        low_confidence = bool(data["low_confidence"]) or spent_to_date == Decimal("0.00")
+
+        return ForecastDTO(
+            year=month_start.year,
+            month=month_start.month,
+            pace=data["pace"],
+            days_in_month=data["days_in_month"],
+            days_elapsed=data["days_elapsed"],
+            days_remaining=data["days_remaining"],
+            spent_to_date=data["spent_to_date"],
+            daily_rate=data["daily_rate"],
+            projected_total=data["projected_total"],
+            low_confidence=low_confidence,
+        )

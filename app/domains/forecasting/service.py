@@ -8,11 +8,27 @@ ROUND_HALF_UP.
 
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TypedDict
 
 from app.domains.forecasting import calendar_math
 from app.domains.forecasting.strategies import WHOLE_MONTH, PaceStrategy
 
 MONEY_QUANTUM = Decimal("0.01")
+
+
+class ForecastData(TypedDict):
+    """Типизированная форма результата forecast_month() (docs/03 §S6.2)."""
+
+    year: int
+    month: int
+    pace: str
+    days_in_month: int
+    days_elapsed: int
+    days_remaining: int
+    spent_to_date: Decimal
+    daily_rate: Decimal
+    projected_total: Decimal
+    low_confidence: bool
 
 
 def money(value: Decimal) -> Decimal:
@@ -53,7 +69,7 @@ def forecast_month(
     pace: PaceStrategy = WHOLE_MONTH,
     recent_window_total: Decimal = Decimal("0.00"),
     extra_known_amounts: Decimal = Decimal("0.00"),
-) -> dict:
+) -> ForecastData:
     """Результат прогноза: календарь, темп, итог и пометка достоверности.
 
     low_confidence при days_elapsed < 3: прогноз статистически мусорный,
