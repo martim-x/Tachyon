@@ -139,3 +139,18 @@ def test_build_chart_assigns_colors_by_share_position() -> None:
 def test_build_chart_rejects_non_positive_top_n() -> None:
     with pytest.raises(ValueError):
         build_chart([point("Продукты", "10.00", "100.00")], top_n=0)
+
+
+def test_build_chart_rejects_top_n_beyond_color_palette() -> None:
+    # Цвет обязан быть уникальным на столбец (легенда неоднозначна иначе),
+    # поэтому top_n больше палитры отклоняется, повторение недопустимо.
+    points = [
+        point(f"Категория {index}", "10.00", "12.50")
+        for index in range(8)
+    ]
+
+    with pytest.raises(ValueError):
+        build_chart(points, top_n=len(points))
+
+    with pytest.raises(ValueError):
+        build_chart(points, top_n=100)
