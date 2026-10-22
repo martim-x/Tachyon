@@ -257,3 +257,52 @@ async def test_monthly_forecast_uses_frozen_clock(
     # В прогноз попадают только 150.00, потраченные к 15 октября:
     # 150 / 15 * 31 = 310.
     assert report.forecast == Decimal("310.00")
+
+
+async def test_report_rejects_period_longer_than_five_years(
+    api_client_a: LoggedInClient,
+) -> None:
+    response = await api_client_a.client.get(
+        "/api/v1/reports/monthly",
+        params={
+            "from": "2020-01-01",
+            "to": "2026-01-01",
+        },
+    )
+
+    assert response.status_code == 422
+
+    body = response.json()
+
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["detail"] == [
+        {
+            "field": "to",
+            "issue": "Период отчёта не может превышать 5 лет",
+        }
+    ]
+
+
+async def test_report_handles_maximum_supported_date(
+    api_client_a: LoggedInClient,
+) -> None:
+    response = await api_client_a.client.get(
+        "/api/v1/reports/monthly",
+        params={
+            "from": "9999-12-31",
+            "to": "9999-12-31",
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["date_from"] == "9999-12-31"
+    assert body["date_to"] == "9999-12-31"
+    assert body["income"] == "0.00"
+    assert body["expense"] == "0.00"
+    assert body["balance"] == "0.00"
+    assert body["forecast"] == "0.00"
+    assert body["forecast_month"] == "9999-12"
+    assert body["categories"] == []

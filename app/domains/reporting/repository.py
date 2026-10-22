@@ -39,16 +39,22 @@ class ReportingRepository(ScopedRepository[Operation]):
         `_scoped()`, поэтому чужой user_id нельзя подставить через API.
         """
 
-        period_end = date_to + timedelta(days=1)
+        scoped_query = self._scoped().where(
+            Operation.occurred_at >= day_start(date_from),
+        )
 
-        scoped_operations = (
-            self._scoped()
-            .where(
-                Operation.occurred_at >= day_start(date_from),
+        # Обычный период фильтруется по исключающей верхней границе:
+        # для 31 октября это будет начало 1 ноября.
+        #
+        # Для date.max нельзя прибавить один день — возникнет OverflowError.
+        # Верхняя граница там не нужна: более позднего datetime не существует.
+        if date_to < date.max:
+            period_end = date_to + timedelta(days=1)
+            scoped_query = scoped_query.where(
                 Operation.occurred_at < day_start(period_end),
             )
-            .subquery()
-        )
+
+        scoped_operations = scoped_query.subquery()
 
         statement = (
             select(

@@ -19,6 +19,8 @@ from app.domains.reporting.queries import (
 from app.domains.reporting.repository import ReportingRepository
 from app.domains.reporting.schemas import ReportDTO, SeriesPointDTO
 
+MAX_REPORT_PERIOD_DAYS = 366 * 5
+
 
 def month_end(month_start: date) -> date:
     """Последний календарный день месяца."""
@@ -50,8 +52,8 @@ def next_month(month_start: date) -> date:
 def dominant_month(date_from: date, date_to: date) -> date:
     """Выбрать месяц, содержащий наибольшее число дней периода.
 
-    При равенстве выбирается более поздний месяц — он ближе к текущему
-    состоянию пользователя и полезнее для прогноза.
+    При равенстве выбирается более поздний месяц. Период ограничен пятью
+    годами, чтобы один запрос не загружал слишком много данных в память.
     """
 
     if date_from > date_to:
@@ -64,6 +66,17 @@ def dominant_month(date_from: date, date_to: date) -> date:
             ]
         )
 
+    period_days = (date_to - date_from).days + 1
+    if period_days > MAX_REPORT_PERIOD_DAYS:
+        raise ValidationError(
+            detail=[
+                {
+                    "field": "to",
+                    "issue": "Период отчёта не может превышать 5 лет",
+                }
+            ]
+        )
+
     current_month = date(
         date_from.year,
         date_from.month,
@@ -71,12 +84,17 @@ def dominant_month(date_from: date, date_to: date) -> date:
     )
     candidates: list[tuple[int, date]] = []
 
-    while current_month <= date_to:
+    while True:
         overlap_start = max(date_from, current_month)
         overlap_end = min(date_to, month_end(current_month))
 
         overlap_days = (overlap_end - overlap_start).days + 1
         candidates.append((overlap_days, current_month))
+
+        # Не вызываем next_month после декабря 9999 и после последнего
+        # месяца запрошенного периода.
+        if current_month.year == date_to.year and current_month.month == date_to.month:
+            break
 
         current_month = next_month(current_month)
 
