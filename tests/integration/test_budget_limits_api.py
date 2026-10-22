@@ -1,104 +1,114 @@
-import uuid
+
 from datetime import date
 from http import HTTPStatus
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import Column, Date, Integer, String, UniqueConstraint, select
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 
-from app.main import app
-from app.core.persistence.session import get_session
+pytestmark = pytest.mark.asyncio
 
-TestBase = declarative_base()
+URL = "/api/v1/budget_limits"
+MONTH = date(2026, 10, 1).isoformat()
 
-class BudgetLimitTestModel(TestBase):
-    __tablename__ = 'budget_limits'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(String(36), nullable=False, index=True)
-    category_id = Column(String(36), nullable=False, index=True)
-    month = Column(Date, nullable=False)
-    limit_amount_cents = Column(Integer, nullable=False)
-    __table_args__ = (UniqueConstraint('user_id', 'category_id', 'month', name = 'uq_budget_limit_'
-                                                                                 'user_category_month'),)
 
-engine = create_async_engine('sqlite+aiosqlite:///./test_budget.db', echo=False)
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+async def test_empty_list(api_client_a):
+    response = await api_client_a.client.get(URL)
 
-@pytest.fixture(scope='function')
-async def db():
-    async with engine.begin() as conn:
-        await conn.run_sync(TestBase.metadata.create_all)
+    assert response.status_code == HTTPStatus.OK, response.text
+    assert response.json() == []
 
-    async with async_session_maker() as session:
-        try:
-            yield session
-        finally:
-            async with engine.begin() as conn:
-                await conn.run_sync(TestBase.metadata.drop_all)
 
-@pytest.fixture
-def client(db):
-    from contextlib import asynccontextmanager
-    from collections.abc import AsyncIterator
+async def test_create_and_conflict(api_client_a, category_factory):
+    category = await category_factory(api_client_a.user)
+    payload = {
+        "category_id": str(category.id),
+        "month": MONTH,
+        "limit_amount_cents": 1000,
+    }
 
-    @asynccontextmanager
-    async def override_get_session() -> AsyncIterator[AsyncSession]:
-        yield db
+    created = await api_client_a.client.post(URL, json=payload)
 
-    app.dependency_overrides[get_session] = override_get_session
+    assert created.status_code == HTTPStatus.CREATED, created.text
+    assert created.json()["user_id"] == str(api_client_a.user.id)
+    assert created.json()["limit_amount_cents"] == 1000
 
-    with TestClient(app) as client:
-        yield client
+    listed = await api_client_a.client.get(URL)
 
-    app.dependency_overrides.clear()
+    assert listed.status_code == HTTPStatus.OK, listed.text
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["category_id"] == str(category.id)
 
-@pytest.fixture
-def ids():
-    return str(uuid.uuid4()), str(uuid.uuid4())
+    duplicate = await api_client_a.client.post(URL, json=payload)
+    assert duplicate.status_code == HTTPStatus.CONFLICT, duplicate.text
 
-@pytest.fixture
-def month():
-    return date.today()
 
-def test_empty_list(client, ids):
-    uid, _ = ids
-    r = client.get('/api/v1/budget_limits', params={'user_id': uid})
-    assert r.status_code == HTTPStatus.OK and r.json() == []
+async def test_zero_limit_error(api_client_a, category_factory):
+    category = await category_factory(api_client_a.user)
 
-def test_create_and_conflict(client, ids, month):
-    uid, cid = ids
-    payload = {'user_id': uid,
-               'category_id': cid,
-               'month': month.isoformat(),
-               'limit_amount_cents': 1000}
+    response = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": MONTH,
+            "limit_amount_cents": 0,
+        },
+    )
 
-    assert (client.post('/api/v1/budget_limits', json=payload).status_code
-            == HTTPStatus.CREATED)
-    assert (client.post('/api/v1/budget_limits', json=payload).status_code
-            == HTTPStatus.CONFLICT)
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, response.text
 
-def test_zero_limit_error(client, ids, month):
-    uid, cid = ids
-    payload = {'user_id': uid,
-               'category_id': cid,
-               'month': month.isoformat(),
-               'limit_amount_cents': 0}
 
-    assert (client.post('/api/v1/budget_limits', json=payload).status_code
-            == HTTPStatus.UNPROCESSABLE_ENTITY)
+async def test_update_limit(api_client_a, category_factory):
+    category = await category_factory(api_client_a.user)
 
-def test_status_ok(client, ids, month):
-    uid, cid = ids
-    client.post('/api/v1/budget_limits', json={
-        'user_id': uid,
-        'category_id': cid,
-        'month': month.isoformat(),
-        'limit_amount_cents': 500
-    })
-    r = client.get('/api/v1/budget_limits', params={'user_id': uid})
+    created = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": MONTH,
+            "limit_amount_cents": 500,
+        },
+    )
+    assert created.status_code == HTTPStatus.CREATED, created.text
 
-    assert r.status_code == HTTPStatus.OK
-    assert r.json()[0]['status'] == 'OK'
+    updated = await api_client_a.client.put(
+        f"{URL}/{category.id}",
+        params={
+            "month": MONTH,
+            "limit_amount_cents": 700,
+        },
+    )
+
+    assert updated.status_code == HTTPStatus.OK, updated.text
+    assert updated.json()["limit_amount_cents"] == 700
+
+    listed = await api_client_a.client.get(URL)
+
+    assert listed.status_code == HTTPStatus.OK, listed.text
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["limit_amount_cents"] == 700
+
+
+async def test_status_ok(api_client_a, category_factory):
+    category = await category_factory(api_client_a.user)
+
+    created = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": MONTH,
+            "limit_amount_cents": 500,
+        },
+    )
+    assert created.status_code == HTTPStatus.CREATED, created.text
+
+    response = await api_client_a.client.get(f"{URL}/status")
+
+    assert response.status_code == HTTPStatus.OK, response.text
+
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["category_id"] == str(category.id)
+    assert data[0]["month"] == MONTH
+    assert data[0]["status"] == "OK"
+    assert data[0]["spent_amount_cents"] == 0
+
 
