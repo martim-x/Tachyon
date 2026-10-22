@@ -1,16 +1,17 @@
 """HTTP API аналитических отчётов (docs/02 §reporting, docs/03 §S6.5)."""
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
+from fastapi.responses import Response
 
 from app.core.errors import ValidationError
 from app.domains.forecasting.schemas import ForecastDTO
 from app.domains.forecasting.strategies import RECENT_WINDOW, WHOLE_MONTH
 from app.domains.reporting.schemas import ReportDTO, SeriesPointDTO
 from app.domains.reporting.service import ReportingService
-from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
+from app.interface.api.deps import ClockDep, CurrentUser, ExportDep, SessionDep
 
 router = APIRouter(
     prefix="/api/v1/reports",
@@ -82,6 +83,49 @@ async def report_by_category(
     return await service.by_category(
         date_from=date_from,
         date_to=date_to,
+    )
+
+
+ExportFormat = Literal["excel", "xlsx"]
+
+
+@router.get(
+    "/monthly/export",
+    summary="Выгрузить отчёт за период в Excel",
+    description=(
+        "Файл xlsx с листами «Операции», «По категориям» и «Сводка»: "
+        "данные собирает та же агрегация домена, что и monthly (NFR-3), "
+        "формат файла - адаптер app.interface.export (docs/03 §S7.1)."
+    ),
+)
+async def export_monthly_report(
+    date_from: DateFrom,
+    date_to: DateTo,
+    _current_user: CurrentUser,
+    session: SessionDep,
+    exporter: ExportDep,
+    export_format: Annotated[
+        ExportFormat,
+        Query(
+            alias="format",
+            description="Формат файла выгрузки",
+        ),
+    ] = "excel",
+) -> Response:
+    service = ReportingService(session)
+    report = await service.export_payload(
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    file = exporter.export(report)
+
+    return Response(
+        content=file.content,
+        media_type=file.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+        },
     )
 
 

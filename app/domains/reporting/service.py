@@ -3,6 +3,7 @@
 import calendar
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,9 +19,15 @@ from app.domains.reporting.queries import (
     CategoryAggregate,
     ReportAggregate,
     aggregate_report,
+    money_from_cents,
 )
 from app.domains.reporting.repository import ReportingRepository
-from app.domains.reporting.schemas import ReportDTO, SeriesPointDTO
+from app.domains.reporting.schemas import (
+    ExportOperationDTO,
+    ExportReportDTO,
+    ReportDTO,
+    SeriesPointDTO,
+)
 
 MAX_REPORT_PERIOD_DAYS = 366 * 5
 
@@ -124,6 +131,17 @@ def to_series_point(
     )
 
 
+def export_operation_kind(kind: str) -> Literal["income", "expense"]:
+    """Проверенный вид операции DTO: чужое значение - ошибка домена."""
+
+    if kind == "income":
+        return "income"
+    if kind == "expense":
+        return "expense"
+
+    raise ValidationError(detail=[{"field": "kind", "issue": "Неизвестный вид операции"}])
+
+
 class ReportingService:
     """Read-only построение месячного и категорийного отчётов."""
 
@@ -217,6 +235,48 @@ class ReportingService:
         )
 
         return [to_series_point(category) for category in aggregate.categories]
+
+    async def export_payload(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+    ) -> ExportReportDTO:
+        """Данные выгрузки за период для адаптера экспорта (docs/03 §S7.1 T1).
+
+        Сводка и категории берутся из той же `aggregate_period`, что и
+        monthly/by-category (NFR-3: одна функция агрегации), операции
+        периода идут построчно тем же scoped-запросом домена. Адаптер в
+        app.interface.export получает только готовые значения вывода.
+        """
+
+        aggregate, _selected_month = await self.aggregate_period(
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        operation_rows = await self._repository.period_operations(
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+        return ExportReportDTO(
+            date_from=date_from,
+            date_to=date_to,
+            income=aggregate.income,
+            expense=aggregate.expense,
+            balance=aggregate.balance,
+            categories=[to_series_point(category) for category in aggregate.categories],
+            operations=[
+                ExportOperationDTO(
+                    occurred_on=row.occurred_at.date(),
+                    category_name=row.category_name,
+                    kind=export_operation_kind(row.kind),
+                    amount=money_from_cents(row.amount_cents),
+                )
+                for row in operation_rows
+            ],
+        )
 
     async def forecast(
         self,

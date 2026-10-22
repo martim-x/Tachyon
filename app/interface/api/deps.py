@@ -18,6 +18,8 @@ from app.core.user_context import (
 from app.domains.identity.models import User
 from app.domains.identity.repository import UserRepository
 from app.domains.identity.service import decode_access_token
+from app.interface.export.base import ReportExporter
+from app.interface.export.xlsx import XlsxReportExporter
 
 
 def get_clock() -> Clock:
@@ -62,6 +64,21 @@ async def get_current_user(
     finally:
         reset_current_user(context_token)
 
+
+def get_xlsx_report_exporter() -> ReportExporter:
+    """Адаптер экспорта собирается снаружи доменов (docs/02 §export).
+
+    Подменяемая зависимость: тесты с FakeExporter не создают ни одного
+    реального файла.
+    """
+
+    return XlsxReportExporter()
+
+
+ExportDep = Annotated[
+    ReportExporter,
+    Depends(get_xlsx_report_exporter, scope="function"),
+]
 
 CurrentUser = Annotated[
     User,

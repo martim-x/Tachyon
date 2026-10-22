@@ -59,6 +59,43 @@ class SeriesPointDTO(BaseModel):
     }
 
 
+class ExportOperationDTO(BaseModel):
+    """Одна операция для листа «Операции» выгрузки."""
+
+    occurred_on: date = Field(description="Дата операции в UTC")
+    category_name: str = Field(description="Название категории или «Без категории»")
+    kind: Literal["income", "expense"] = Field(description="Вид операции")
+    amount: Decimal = Field(
+        decimal_places=2,
+        description="Сумма операции",
+    )
+
+
+class ExportReportDTO(BaseModel):
+    """Данные отчёта, собранные доменом для адаптера экспорта.
+
+    Единый вход для xlsx/pdf/csv: адаптер только форматирует результат
+    общей агрегации домена (NFR-3), сами «операции» идут построчно.
+    """
+
+    date_from: date = Field(description="Начало отчётного периода включительно")
+    date_to: date = Field(description="Конец отчётного периода включительно")
+    income: Decimal = Field(
+        decimal_places=2,
+        description="Доходы за период",
+    )
+    expense: Decimal = Field(
+        decimal_places=2,
+        description="Расходы за период",
+    )
+    balance: Decimal = Field(
+        decimal_places=2,
+        description="Доходы минус расходы",
+    )
+    operations: list[ExportOperationDTO] = Field(description="Операции периода")
+    categories: list[SeriesPointDTO] = Field(description="Разбивка расходов по категориям")
+
+
 class ReportDTO(BaseModel):
     """Полный финансовый отчёт за период."""
 
