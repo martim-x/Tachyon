@@ -12,15 +12,13 @@ from app.core.clock import SystemClock
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.persistence.session import session_scope
-from app.domains.identity.api import router as identity_router
-from app.domains.ledger.api import router as ledger_router
-from app.domains.scheduling.api import router as scheduling_router
 from app.domains.scheduling.service import RecurringService
 from app.infrastructure.scheduler import OperationScheduler
 from app.interface.api.exception_handlers import (
     error_body,
     register_exception_handlers,
 )
+from app.interface.api.routers import api_router
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +101,7 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(application)
-    application.include_router(identity_router)
-    application.include_router(ledger_router)
-    application.include_router(scheduling_router)
+    application.include_router(api_router)
 
     @application.get("/health", tags=["Система"])
     async def health() -> dict[str, str]:
