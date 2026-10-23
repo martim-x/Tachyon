@@ -19,6 +19,7 @@ from tests.conftest import (
 
 pytestmark = pytest.mark.integration
 
+
 async def test_db_session_schema_comes_from_migrations(
     db_session: async_sessionmaker[AsyncSession],
 ) -> None:

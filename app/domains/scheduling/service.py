@@ -12,10 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFound
 from app.core.money import Money
 from app.domains.scheduling.models import RecurringExecution, RecurringRule
 from app.domains.scheduling.ports import OperationWriter
+from app.domains.scheduling.repository import (
+    RecurringRuleRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,7 @@ class RecurringService:
         operation_writer: OperationWriter | None = None,
     ) -> None:
         self._session = session
+        self._rules = RecurringRuleRepository(session)
         self._operation_writer = operation_writer
 
     @property
@@ -99,42 +102,63 @@ class RecurringService:
             self._operation_writer = lambda **kw: create_operation_impl(self._session, **kw)
         return self._operation_writer
 
-    async def create_rule(self, rule: RecurringRule) -> RecurringRule:
-        self._session.add(rule)
-        await self._session.flush()
-        return rule
+    async def create_rule(
+        self,
+        rule: RecurringRule,
+    ) -> RecurringRule:
+        """Создать правило с проверкой владельца категории."""
 
-    async def get_rule(self, rule_id: str, user_id: str) -> RecurringRule:
-        rule = await self._session.get(RecurringRule, rule_id)
-        if rule is None or rule.user_id != user_id:
-            raise NotFound("Правило не найдено")
-        return rule
-
-    async def list_rules(self, user_id: str) -> list[RecurringRule]:
-        result = await self._session.execute(
-            select(RecurringRule).where(RecurringRule.user_id == user_id)
+        return await self._rules.create(
+            category_id=rule.category_id,
+            kind=rule.kind,
+            interval=rule.interval,
+            amount_cents=rule.amount_cents,
+            note=rule.note,
+            start_date=rule.start_date,
+            end_date=rule.end_date,
+            next_run_at=rule.next_run_at,
         )
-        return list(result.scalars().all())
+
+    async def get_rule(
+        self,
+        rule_id: UUID,
+    ) -> RecurringRule:
+        """Получить только своё правило."""
+
+        return await self._rules.get_or_404(
+            rule_id,
+        )
+
+    async def list_rules(
+        self,
+    ) -> list[RecurringRule]:
+        """Получить правила текущего пользователя."""
+
+        rules = await self._rules.list()
+        return list(rules)
 
     async def update_rule(
         self,
-        rule_id: str,
-        user_id: str,
+        rule_id: UUID,
         **fields,
     ) -> RecurringRule:
-        rule = await self.get_rule(rule_id, user_id)
-        for k, v in fields.items():
-            if v is not None:
-                setattr(rule, k, v)
-            elif k in ("note", "end_date"):  # Разрешаем явно очистить эти поля
-                setattr(rule, k, v)
-        await self._session.flush()
-        return rule
+        """Изменить своё правило и проверить новые внешние ключи."""
 
-    async def delete_rule(self, rule_id: str, user_id: str) -> bool:
-        rule = await self.get_rule(rule_id, user_id)
-        rule.is_active = False  # мягкое удаление
-        await self._session.flush()
+        return await self._rules.update(
+            rule_id,
+            **fields,
+        )
+
+    async def delete_rule(
+        self,
+        rule_id: UUID,
+    ) -> bool:
+        """Мягко отключить правило текущего пользователя."""
+
+        await self._rules.update(
+            rule_id,
+            is_active=False,
+        )
         return True
 
     async def generate_due_operations(

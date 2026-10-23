@@ -1,9 +1,9 @@
-"""HTTP-интерфейс операций: разбор запроса, вызов сервиса, сериализация (docs/02)."""
+"""HTTP API операций и категорий."""
 
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Path, Query, status
 
 from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import OperationRepository
@@ -18,14 +18,32 @@ from app.domains.ledger.schemas import (
     OperationPageDTO,
     OperationUpdate,
 )
-from app.domains.ledger.service import CategoryService, OperationService
+from app.domains.ledger.service import (
+    CategoryService,
+    OperationService,
+)
 from app.interface.api.deps import CurrentUser, SessionDep
+from app.interface.api.schemas import error_responses
 
-router = APIRouter(prefix="/api/v1", tags=["Операции"])
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["Операции"],
+)
+
+OperationId = Annotated[
+    UUID,
+    Path(description="Идентификатор операции"),
+]
+
+CategoryId = Annotated[
+    UUID,
+    Path(description="Идентификатор категории"),
+]
 
 
-def _operation_dto(operation: Operation) -> OperationDTO:
-    """Сумма читается только через репозиторий (docs/02, правило границы денег)."""
+def _operation_dto(
+    operation: Operation,
+) -> OperationDTO:
     return OperationDTO(
         id=operation.id,
         user_id=operation.user_id,
@@ -38,7 +56,9 @@ def _operation_dto(operation: Operation) -> OperationDTO:
     )
 
 
-def _category_dto(category: Category) -> CategoryDTO:
+def _category_dto(
+    category: Category,
+) -> CategoryDTO:
     return CategoryDTO(
         id=category.id,
         user_id=category.user_id,
@@ -53,6 +73,12 @@ def _category_dto(category: Category) -> CategoryDTO:
     "/operations",
     response_model=OperationDTO,
     status_code=status.HTTP_201_CREATED,
+    summary="Создать операцию",
+    description=(
+        "Создаёт доход или расход текущего пользователя. "
+        "Сумма передаётся как Decimal с двумя знаками."
+    ),
+    responses=error_responses(401, 404, 422),
 )
 async def create_operation(
     payload: OperationCreate,
@@ -60,16 +86,29 @@ async def create_operation(
     session: SessionDep,
 ) -> OperationDTO:
     operation = await OperationService(session).create(payload)
+
     return _operation_dto(operation)
 
 
-@router.get("/operations", response_model=OperationPageDTO)
+@router.get(
+    "/operations",
+    response_model=OperationPageDTO,
+    summary="Получить список операций",
+    description=(
+        "Возвращает страницу операций текущего пользователя с фильтрами по датам, категории и типу."
+    ),
+    responses=error_responses(401, 422),
+)
 async def list_operations(
-    query: Annotated[OperationListQuery, Query()],
+    query: Annotated[
+        OperationListQuery,
+        Query(),
+    ],
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> OperationPageDTO:
     operations, total = await OperationService(session).list_page(query)
+
     return OperationPageDTO(
         items=[_operation_dto(operation) for operation in operations],
         total=total,
@@ -78,42 +117,76 @@ async def list_operations(
     )
 
 
-@router.get("/operations/{operation_id}", response_model=OperationDTO)
+@router.get(
+    "/operations/{operation_id}",
+    response_model=OperationDTO,
+    summary="Получить операцию",
+    description=(
+        "Возвращает операцию текущего пользователя. "
+        "Чужая и отсутствующая операция дают одинаковый 404."
+    ),
+    responses=error_responses(401, 404, 422),
+)
 async def get_operation(
-    operation_id: UUID,
+    operation_id: OperationId,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> OperationDTO:
     operation = await OperationService(session).get(operation_id)
+
     return _operation_dto(operation)
 
 
-@router.patch("/operations/{operation_id}", response_model=OperationDTO)
+@router.patch(
+    "/operations/{operation_id}",
+    response_model=OperationDTO,
+    summary="Изменить операцию",
+    description=("Частично изменяет операцию текущего пользователя."),
+    responses=error_responses(401, 404, 422),
+)
 async def patch_operation(
-    operation_id: UUID,
+    operation_id: OperationId,
     payload: OperationUpdate,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> OperationDTO:
-    operation = await OperationService(session).update(operation_id, payload)
+    operation = await OperationService(session).update(
+        operation_id,
+        payload,
+    )
+
     return _operation_dto(operation)
 
 
-@router.delete("/operations/{operation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/operations/{operation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить операцию",
+    description=("Удаляет операцию текущего пользователя."),
+    responses=error_responses(401, 404, 422),
+)
 async def delete_operation(
-    operation_id: UUID,
+    operation_id: OperationId,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> None:
     await OperationService(session).delete(operation_id)
 
 
-@router.get("/categories", response_model=list[CategoryDTO], tags=["Категории"])
+@router.get(
+    "/categories",
+    response_model=list[CategoryDTO],
+    tags=["Категории"],
+    summary="Получить категории",
+    description=("Возвращает категории доходов и расходов текущего пользователя."),
+    responses=error_responses(401),
+)
 async def list_categories(
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> list[CategoryDTO]:
     categories = await CategoryService(session).list()
+
     return [_category_dto(category) for category in categories]
 
 
@@ -122,6 +195,11 @@ async def list_categories(
     response_model=CategoryDTO,
     status_code=status.HTTP_201_CREATED,
     tags=["Категории"],
+    summary="Создать категорию",
+    description=(
+        "Создаёт категорию доходов или расходов. Название уникально для текущего пользователя."
+    ),
+    responses=error_responses(401, 409, 422),
 )
 async def create_category(
     payload: CategoryCreate,
@@ -129,6 +207,7 @@ async def create_category(
     session: SessionDep,
 ) -> CategoryDTO:
     category = await CategoryService(session).create(payload)
+
     return _category_dto(category)
 
 
@@ -136,13 +215,17 @@ async def create_category(
     "/categories/{category_id}",
     response_model=CategoryDTO,
     tags=["Категории"],
+    summary="Получить категорию",
+    description=("Возвращает категорию текущего пользователя."),
+    responses=error_responses(401, 404, 422),
 )
 async def get_category(
-    category_id: UUID,
+    category_id: CategoryId,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> CategoryDTO:
     category = await CategoryService(session).get(category_id)
+
     return _category_dto(category)
 
 
@@ -150,14 +233,26 @@ async def get_category(
     "/categories/{category_id}",
     response_model=CategoryDTO,
     tags=["Категории"],
+    summary="Изменить категорию",
+    description=("Изменяет название или тип категории."),
+    responses=error_responses(
+        401,
+        404,
+        409,
+        422,
+    ),
 )
 async def patch_category(
-    category_id: UUID,
+    category_id: CategoryId,
     payload: CategoryUpdate,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> CategoryDTO:
-    category = await CategoryService(session).update(category_id, payload)
+    category = await CategoryService(session).update(
+        category_id,
+        payload,
+    )
+
     return _category_dto(category)
 
 
@@ -165,9 +260,12 @@ async def patch_category(
     "/categories/{category_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Категории"],
+    summary="Удалить категорию",
+    description=("Удаляет категорию текущего пользователя."),
+    responses=error_responses(401, 404, 422),
 )
 async def delete_category(
-    category_id: UUID,
+    category_id: CategoryId,
     _current_user: CurrentUser,
     session: SessionDep,
 ) -> None:

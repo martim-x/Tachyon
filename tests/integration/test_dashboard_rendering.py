@@ -93,7 +93,7 @@ async def test_render_category_chart_from_domain_aggregation(
     assert "33.33%" in html
     assert "150.00" in html
     assert "100.00%" in html
-    assert "data-percent=\"66.67\"" in html
+    assert 'data-percent="66.67"' in html
 
 
 async def test_rendering_isolation_alice_chart_has_no_bob_categories(

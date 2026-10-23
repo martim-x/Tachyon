@@ -11,9 +11,8 @@ class LimitStatus(Enum):
 
 LIMIT_WARNING_RATIO = Decimal("0.8")
 
-def limit_status(limit: Decimal | None,
-                 spent: Decimal,
-                 projected: Decimal) -> LimitStatus:
+
+def limit_status(limit: Decimal | None, spent: Decimal, projected: Decimal) -> LimitStatus:
     """Возвращает статус в порядке приоритета.
 
     EXCEEDED: фактические расходы достигли лимита или превысили его.

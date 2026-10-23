@@ -1,18 +1,21 @@
+"""HTTP API бюджетных лимитов."""
+
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_validator,
-)
+from fastapi import APIRouter, Path, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import Conflict, NotFound
 from app.domains.budget.models import BudgetLimit
+from app.domains.budget.schemas import (
+    LimitCreate,
+    LimitRead,
+    LimitStatusDTO,
+)
 from app.domains.budget.service import limit_status
 from app.domains.forecasting.service import forecast_month
 from app.domains.ledger.models import Category, Operation
@@ -21,11 +24,39 @@ from app.interface.api.deps import (
     CurrentUser,
     SessionDep,
 )
+from app.interface.api.schemas import error_responses
 
 router = APIRouter(
-    prefix="/api/v1/budget_limits",
-    tags=["budget-limits"],
+    prefix="/api/v1/budget-limits",
+    tags=["Бюджет"],
 )
+
+CategoryId = Annotated[
+    UUID,
+    Path(
+        description="Идентификатор категории, для которой установлен лимит.",
+    ),
+]
+
+MonthQuery = Annotated[
+    date,
+    Query(
+        description=(
+            "Месяц действия лимита. Допускается любая дата месяца; "
+            "она нормализуется к первому числу."
+        ),
+        examples=["2026-10-01"],
+    ),
+]
+
+LimitAmountQuery = Annotated[
+    int,
+    Query(
+        gt=0,
+        description="Новый размер лимита в целых копейках.",
+        examples=[500000],
+    ),
+]
 
 
 def normalize_month(value: date) -> date:
@@ -35,7 +66,7 @@ def normalize_month(value: date) -> date:
 
 
 def next_month(month: date) -> date:
-    """Первый день следующего месяца."""
+    """Получить первый день следующего месяца."""
 
     if month.month == 12:
         return date(month.year + 1, 1, 1)
@@ -48,7 +79,7 @@ def next_month(month: date) -> date:
 
 
 def day_start(day: date) -> datetime:
-    """Начало календарного дня в UTC."""
+    """Получить начало календарного дня в UTC."""
 
     return datetime(
         day.year,
@@ -58,33 +89,16 @@ def day_start(day: date) -> datetime:
     )
 
 
-class LimitCreate(BaseModel):
-    category_id: UUID
-    month: date
-    limit_amount_cents: int = Field(gt=0)
-
-    @field_validator("month")
-    @classmethod
-    def month_starts_on_first_day(
-        cls,
-        value: date,
-    ) -> date:
-        return normalize_month(value)
-
-
-class LimitRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    user_id: UUID
-    category_id: UUID
-    month: date
-    limit_amount_cents: int
-
-
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=LimitRead,
+    summary="Создать бюджетный лимит",
+    description=(
+        "Создаёт месячный лимит расходов для категории текущего пользователя. "
+        "Для одной категории допускается только один лимит на месяц."
+    ),
+    responses=error_responses(401, 404, 409, 422),
 )
 async def create_limit(
     payload: LimitCreate,
@@ -99,23 +113,20 @@ async def create_limit(
     category = category_result.scalar_one_or_none()
 
     if category is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Категория не найдена",
-        )
+        raise NotFound("Категория бюджетного лимита не найдена")
 
-    stmt = select(BudgetLimit).where(
+    statement = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
         BudgetLimit.category_id == payload.category_id,
         BudgetLimit.month == payload.month,
     )
-    result = await session.execute(stmt)
+    result = await session.execute(statement)
     existing = result.scalar_one_or_none()
 
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Лимит уже существует",
+        raise Conflict(
+            "Бюджетный лимит уже существует",
+            safe_message="Лимит уже существует",
         )
 
     new_limit = BudgetLimit(
@@ -127,10 +138,11 @@ async def create_limit(
     try:
         await session.flush()
     except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Лимит уже существует",
+        # Это исключение также закрывает гонку двух одновременных запросов.
+        # session_scope выполнит rollback после выхода с исключением.
+        raise Conflict(
+            "Нарушено ограничение уникальности бюджетного лимита",
+            safe_message="Лимит уже существует",
         ) from exc
 
     return new_limit
@@ -139,15 +151,21 @@ async def create_limit(
 @router.get(
     "",
     response_model=list[LimitRead],
+    summary="Получить бюджетные лимиты",
+    description=(
+        "Возвращает все бюджетные лимиты текущего пользователя. "
+        "Если лимитов нет, возвращается пустой список."
+    ),
+    responses=error_responses(401),
 )
 async def limits_list(
     current_user: CurrentUser,
     session: SessionDep,
 ):
-    stmt = select(BudgetLimit).where(
+    statement = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
     )
-    result = await session.execute(stmt)
+    result = await session.execute(statement)
 
     return result.scalars().all()
 
@@ -155,35 +173,32 @@ async def limits_list(
 @router.put(
     "/{category_id}",
     response_model=LimitRead,
+    summary="Изменить бюджетный лимит",
+    description=(
+        "Изменяет размер лимита для категории и указанного месяца. "
+        "Чужой или несуществующий лимит возвращает одинаковую ошибку 404."
+    ),
+    responses=error_responses(401, 404, 422),
 )
 async def update_limit(
-    category_id: UUID,
-    month: date,
-    limit_amount_cents: int,
+    category_id: CategoryId,
+    month: MonthQuery,
+    limit_amount_cents: LimitAmountQuery,
     current_user: CurrentUser,
     session: SessionDep,
 ):
-    month = normalize_month(month)
+    normalized_month = normalize_month(month)
 
-    if limit_amount_cents <= 0:
-        raise HTTPException(
-            status_code=(status.HTTP_422_UNPROCESSABLE_CONTENT),
-            detail="Лимит должен быть больше 0",
-        )
-
-    stmt = select(BudgetLimit).where(
+    statement = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
         BudgetLimit.category_id == category_id,
-        BudgetLimit.month == month,
+        BudgetLimit.month == normalized_month,
     )
-    result = await session.execute(stmt)
+    result = await session.execute(statement)
     limit = result.scalar_one_or_none()
 
     if limit is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Лимит не найден",
-        )
+        raise NotFound("Бюджетный лимит не найден")
 
     limit.limit_amount_cents = limit_amount_cents
     await session.flush()
@@ -191,20 +206,30 @@ async def update_limit(
     return limit
 
 
-@router.get("/status")
+@router.get(
+    "/status",
+    response_model=list[LimitStatusDTO],
+    summary="Получить состояние бюджетных лимитов",
+    description=(
+        "Возвращает фактические расходы, остаток и прогноз для каждого "
+        "бюджетного лимита текущего пользователя. Если лимитов нет, "
+        "возвращается пустой список."
+    ),
+    responses=error_responses(401),
+)
 async def get_statuses(
     current_user: CurrentUser,
     session: SessionDep,
     clock: ClockDep,
-):
-    stmt = select(BudgetLimit).where(
+) -> list[LimitStatusDTO]:
+    statement = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
     )
-    result = await session.execute(stmt)
+    result = await session.execute(statement)
     limits = result.scalars().all()
 
     today = clock.today()
-    result_data = []
+    result_data: list[LimitStatusDTO] = []
 
     for limit_obj in limits:
         month_start = normalize_month(limit_obj.month)
@@ -218,7 +243,7 @@ async def get_statuses(
         else:
             actual_period_end = month_after
 
-        spent_stmt = select(
+        spent_statement = select(
             func.coalesce(
                 func.sum(Operation.amount_cents),
                 0,
@@ -230,7 +255,7 @@ async def get_statuses(
             Operation.occurred_at >= day_start(month_start),
             Operation.occurred_at < day_start(actual_period_end),
         )
-        spent_amount_cents = int(await session.scalar(spent_stmt) or 0)
+        spent_amount_cents = int(await session.scalar(spent_statement) or 0)
 
         limit_dec = Decimal(limit_obj.limit_amount_cents) / Decimal("100")
         spent_dec = Decimal(spent_amount_cents) / Decimal("100")
@@ -266,7 +291,7 @@ async def get_statuses(
             )
         )
 
-        status_val = limit_status(
+        status_value = limit_status(
             limit_dec,
             spent_dec,
             projected_dec,
@@ -277,23 +302,26 @@ async def get_statuses(
                 rounding=ROUND_HALF_UP,
             )
             if limit_dec > 0
-            else Decimal("0")
+            else Decimal("0.0000")
         )
 
+        # Процент хранится с точностью до четырёх знаков после запятой.
         result_data.append(
-            {
-                "category_id": limit_obj.category_id,
-                "month": month_start,
-                "limit_amount_cents": (limit_obj.limit_amount_cents),
-                "spent_amount_cents": (spent_amount_cents),
-                "remaining_amount_cents": max(
-                    limit_obj.limit_amount_cents - spent_amount_cents,
-                    0,
-                ),
-                "projected_amount_cents": (projected_amount_cents),
-                "percent": percent,
-                "status": status_val.name,
-            }
+            LimitStatusDTO.model_validate(
+                {
+                    "category_id": limit_obj.category_id,
+                    "month": month_start,
+                    "limit_amount_cents": limit_obj.limit_amount_cents,
+                    "spent_amount_cents": spent_amount_cents,
+                    "remaining_amount_cents": max(
+                        limit_obj.limit_amount_cents - spent_amount_cents,
+                        0,
+                    ),
+                    "projected_amount_cents": projected_amount_cents,
+                    "percent": percent,
+                    "status": status_value.name,
+                }
+            )
         )
 
     return result_data

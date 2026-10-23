@@ -7,7 +7,7 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-URL = "/api/v1/budget_limits"
+URL = "/api/v1/budget-limits"
 MONTH = date(2026, 10, 1).isoformat()
 
 
@@ -105,6 +105,37 @@ async def test_update_limit(
     assert listed.json()[0]["limit_amount_cents"] == 700
 
 
+async def test_update_limit_rejects_zero_amount(
+    api_client_a,
+    category_factory,
+):
+    category = await category_factory(
+        api_client_a.user,
+    )
+
+    created = await api_client_a.client.post(
+        URL,
+        json={
+            "category_id": str(category.id),
+            "month": MONTH,
+            "limit_amount_cents": 500,
+        },
+    )
+
+    assert created.status_code == HTTPStatus.CREATED, created.text
+
+    response = await api_client_a.client.put(
+        f"{URL}/{category.id}",
+        params={
+            "month": MONTH,
+            "limit_amount_cents": 0,
+        },
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 async def test_status_ok(
     api_client_a,
     category_factory,
@@ -131,6 +162,14 @@ async def test_status_ok(
     assert data[0]["month"] == MONTH
     assert data[0]["status"] == "OK"
     assert data[0]["spent_amount_cents"] == 0
+    assert isinstance(
+        data[0]["percent"],
+        int | float,
+    )
+    assert not isinstance(
+        data[0]["percent"],
+        str,
+    )
 
 
 async def test_month_is_normalized_to_first_day(
