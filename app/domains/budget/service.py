@@ -1,6 +1,8 @@
 from decimal import Decimal
 from enum import Enum, auto
 
+from app.core.events import BudgetThreshold
+
 
 class LimitStatus(Enum):
     OK = auto()
@@ -33,3 +35,24 @@ def limit_status(limit: Decimal | None, spent: Decimal, projected: Decimal) -> L
         return LimitStatus.WARNING
 
     return LimitStatus.OK
+
+
+def reached_threshold(
+    limit_amount_cents: int,
+    spent_amount_cents: int,
+) -> BudgetThreshold | None:
+    """Определить достигнутый порог по фактическим расходам.
+
+    EXCEEDED имеет приоритет над WARNING. Расчёт выполняется в целых
+    копейках без float, чтобы границы 80% и 100% были точными.
+    """
+    if limit_amount_cents <= 0:
+        return None
+
+    if spent_amount_cents >= limit_amount_cents:
+        return "EXCEEDED"
+
+    if spent_amount_cents * 100 >= limit_amount_cents * 80:
+        return "WARNING"
+
+    return None
