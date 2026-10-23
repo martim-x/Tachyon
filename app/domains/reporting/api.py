@@ -188,7 +188,20 @@ async def export_monthly_report(
         "(docs/03 §S7.2). Суммы рендерятся строками с двумя знаками "
         "из Decimal, кириллица обеспечена встроенным шрифтом DejaVu."
     ),
-    responses=error_responses(401, 422),
+    responses={
+        **error_responses(401, 422),
+        200: {
+            "description": "Отчёт успешно сформирован.",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary",
+                    }
+                }
+            },
+        },
+    },
 )
 async def export_report_pdf(
     date_from: DateFrom,
