@@ -1,0 +1,28 @@
+# Секреты и локальные данные не попадают в образ.
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite3
+tachyon.db
+
+# VCS / IDE / кэши
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.egg-info
+
+# Тесты и документация не нужны в runtime-образе.
+tests
+docs
+migrations/__pycache__
+*.log
+logs
+bandit-report.json
+.DS_Store
