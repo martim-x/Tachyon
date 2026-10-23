@@ -137,3 +137,35 @@ async def test_recurring_rule_rejects_foreign_category(
 
     assert unchanged.status_code == 200
     assert unchanged.json()["category_id"] == str(own_category.id)
+
+
+async def test_recurring_rule_rejects_null_for_required_fields(
+    api_client_a: LoggedInClient,
+    rule_factory: RuleFactory,
+) -> None:
+    rule = await rule_factory(
+        api_client_a.user,
+    )
+
+    required_fields = (
+        "category_id",
+        "kind",
+        "interval",
+        "amount_cents",
+        "start_date",
+        "is_active",
+    )
+
+    for field_name in required_fields:
+        response = await api_client_a.client.patch(
+            f"{URL}/{rule.id}",
+            json={
+                field_name: None,
+            },
+        )
+
+        assert response.status_code == 422, (
+            field_name,
+            response.text,
+        )
+        assert response.json()["error"]["code"] == ("VALIDATION_ERROR")

@@ -127,6 +127,32 @@ class RecurringRuleUpdate(BaseModel):
         description="Признак активности правила.",
     )
 
+    @model_validator(mode="after")
+    def non_nullable_fields_cannot_be_null(
+        self,
+    ) -> "RecurringRuleUpdate":
+        """Разрешить null только для очищаемых note и end_date."""
+
+        non_nullable_fields = {
+            "category_id",
+            "kind",
+            "interval",
+            "amount_cents",
+            "start_date",
+            "is_active",
+        }
+
+        invalid_fields = sorted(
+            field_name
+            for field_name in non_nullable_fields
+            if field_name in self.model_fields_set and getattr(self, field_name) is None
+        )
+
+        if invalid_fields:
+            raise ValueError("Нельзя передать null для полей: " + ", ".join(invalid_fields))
+
+        return self
+
 
 class RecurringRuleDTO(RecurringRuleBase):
     """Повторяющееся правило в ответе API."""

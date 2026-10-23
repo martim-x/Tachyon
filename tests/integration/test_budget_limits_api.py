@@ -162,6 +162,14 @@ async def test_status_ok(
     assert data[0]["month"] == MONTH
     assert data[0]["status"] == "OK"
     assert data[0]["spent_amount_cents"] == 0
+    assert isinstance(
+        data[0]["percent"],
+        int | float,
+    )
+    assert not isinstance(
+        data[0]["percent"],
+        str,
+    )
 
 
 async def test_month_is_normalized_to_first_day(

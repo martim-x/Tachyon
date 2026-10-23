@@ -1,7 +1,6 @@
 """Схемы бюджетных лимитов и их текущего состояния."""
 
 from datetime import date
-from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -130,9 +129,11 @@ class LimitStatusDTO(BaseModel):
     projected_amount_cents: int = Field(
         description="Прогноз расходов к окончанию месяца в целых копейках.",
     )
-    percent: Decimal = Field(
-        description="Доля использованного лимита без потери точности.",
-        examples=["0.7000"],
+    percent: float = Field(
+        description=(
+            "Числовая доля использованного лимита: 0.7 означает использование 70% лимита."
+        ),
+        examples=[0.7],
     )
     status: BudgetStatus = Field(
         description=("Состояние лимита: OK, WARNING, EXCEEDED или EXCEEDED_PROJECTED."),
