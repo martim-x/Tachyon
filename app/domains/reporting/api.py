@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.core.errors import ValidationError
 from app.domains.forecasting.schemas import ForecastDTO
@@ -24,6 +25,7 @@ from app.interface.api.deps import (
     SessionDep,
 )
 from app.interface.api.schemas import error_responses
+from app.interface.export.pdf import build_pdf_report, report_file_name
 
 router = APIRouter(
     prefix="/api/v1/reports",
@@ -175,6 +177,52 @@ async def export_monthly_report(
         headers={
             "Content-Disposition": (f'attachment; filename="{file.filename}"'),
         },
+    )
+
+
+@router.get(
+    "/monthly/export/pdf",
+    response_class=Response,
+    summary="Экспорт отчёта в PDF",
+    description=(
+        "Возвращает тот же отчёт, что /monthly, файлом application/pdf "
+        "(docs/03 §S7.2). Суммы рендерятся строками с двумя знаками "
+        "из Decimal, кириллица обеспечена встроенным шрифтом DejaVu."
+    ),
+    responses={
+        **error_responses(401, 422),
+        200: {
+            "description": "Отчёт успешно сформирован.",
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary",
+                    }
+                }
+            },
+        },
+    },
+)
+async def export_report_pdf(
+    date_from: DateFrom,
+    date_to: DateTo,
+    _current_user: CurrentUser,
+    session: SessionDep,
+    clock: ClockDep,
+) -> Response:
+    # Единая агрегация TT-26 (NFR-3): pandas-логика не дублируется.
+    service = ReportingService(session, clock=clock)
+    report = await service.monthly(date_from=date_from, date_to=date_to)
+
+    # Сборка LongTable - синхронная CPU-работа: уводим её из event loop.
+    pdf_bytes = await run_in_threadpool(build_pdf_report, report)
+    filename = report_file_name(report.date_from, report.date_to)
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
