@@ -2395,7 +2395,7 @@
             "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
             "limit_amount_cents": 100000,
             "month": "2026-10-01",
-            "percent": "0.7000",
+            "percent": 0.7,
             "projected_amount_cents": 144667,
             "remaining_amount_cents": 30000,
             "spent_amount_cents": 70000,

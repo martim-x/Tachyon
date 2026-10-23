@@ -104,7 +104,7 @@ class LimitStatusDTO(BaseModel):
                     "spent_amount_cents": 70000,
                     "remaining_amount_cents": 30000,
                     "projected_amount_cents": 144667,
-                    "percent": "0.7000",
+                    "percent": 0.7,
                     "status": "EXCEEDED_PROJECTED",
                 }
             ]
