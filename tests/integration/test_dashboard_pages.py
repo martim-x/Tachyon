@@ -121,6 +121,41 @@ async def test_dashboard_page_isolation_hides_other_user_data(
     assert "77.77" not in html_b
 
 
+async def test_dashboard_page_accepts_empty_form_values(
+    api_client_a: LoggedInClient,
+    category_factory: CategoryFactory,
+    operation_factory: OperationFactory,
+) -> None:
+    """Duo review !29: браузерная форма шлёт все поля, включая пустые строки.
+
+    Незаполненные фильтры это «фильтр не задан», а не 422: страница
+    должна отдаться HTML с новой сводкой. Порядок дат при обоих
+    непустых значениях по-прежнему валидируется доменной моделью.
+    """
+    client: AsyncClient = api_client_a.client
+
+    all_empty = await client.get(
+        "/dashboard",
+        params={"from": "", "to": "", "category_id": "", "type": ""},
+    )
+    assert all_empty.status_code == 200
+    assert "<!doctype html>" in all_empty.text.lower()
+
+    # Страница всё ещё отдаётся, если заполнено только одно поле формы.
+    partial = await client.get(
+        "/dashboard",
+        params={"from": "2026-10-10", "category_id": ""},
+    )
+    assert partial.status_code == 200
+
+    # Оба заполненных поля валидируются: перевёрнутый период — 422.
+    reversed_period = await client.get(
+        "/dashboard",
+        params={"from": "2026-10-15", "to": "2026-10-10"},
+    )
+    assert reversed_period.status_code == 422
+
+
 async def test_dashboard_page_filters_operations_by_period_category_and_foreign_id(
     api_client_a: LoggedInClient,
     api_client_b: LoggedInClient,

@@ -31,6 +31,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
 from fastapi.templating import Jinja2Templates
+from pydantic import model_validator as pydantic_model_validator
 from starlette.responses import Response
 
 from app.domains.ledger.models import Category, Operation
@@ -41,6 +42,33 @@ from app.domains.reporting.service import ReportingService
 from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+
+class DashboardFilters(OperationListQuery):
+    """Фильтры HTML-формы дашборда: те же поля, что у GET /api/v1/operations.
+
+    Браузерная форма всегда отсылает все свои поля: незаполненное поле
+    приходит пустой строкой, а не отсутствует в запросе. Для фильтров
+    пустая строка означает «не задан», поэтому она превращается в None
+    до доменной валидации (Duo review !29: иначе запрос формы
+    GET /dashboard?from=&to=&… даёт 422 JSON вместо HTML-страницы).
+    Правило порядка дат и остальные правила остаются в родительской
+    OperationListQuery — второй копии правил валидации нет.
+    """
+
+    @pydantic_model_validator(mode="before")
+    @classmethod
+    def _empty_form_fields_are_unset(cls, data: object) -> object:
+        if not isinstance(data, dict) or not data:
+            return data
+        values = dict(data)
+        for name in ("date_from", "date_to", "category_id", "kind"):
+            field = cls.model_fields[name]
+            for key in (name, field.alias or name):
+                if values.get(key) == "":
+                    values[key] = None
+        return values
+
 
 router = APIRouter(tags=["Дашборд"])
 
@@ -94,7 +122,7 @@ def _category_option(category: Category) -> dict[str, str]:
 
 @router.get("/dashboard", summary="Страница дашборда")
 async def dashboard_page(
-    query: Annotated[OperationListQuery, Query()],
+    query: Annotated[DashboardFilters, Query()],
     request: Request,
     current_user: CurrentUser,
     session: SessionDep,
@@ -105,8 +133,9 @@ async def dashboard_page(
     Сводка это месячный отчёт за текущий месяц (доходы, расходы, остаток
     и прогноз на месяц, docs/03 §S8.1 T1): один вызов ReportingService.monthly
     по часам ClockDep. Фильтры последнего блока операций - поля
-    OperationListQuery, как у GET /api/v1/operations. Анонимный запрос
-    получает 401 от зависимости CurrentUser, как у остального API.
+    DashboardFilters (наследует OperationListQuery, как у GET /api/v1/
+    operations). Анонимный запрос получает 401 от зависимости CurrentUser,
+    как у остального API.
     """
 
     today = clock.today()
