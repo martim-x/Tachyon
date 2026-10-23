@@ -1822,6 +1822,86 @@
         }
       }
     },
+    "/api/v1/reports/monthly/export/pdf": {
+      "get": {
+        "tags": [
+          "Отчёты"
+        ],
+        "summary": "Экспорт отчёта в PDF",
+        "description": "Возвращает тот же отчёт, что /monthly, файлом application/pdf (docs/03 §S7.2). Суммы рендерятся строками с двумя знаками из Decimal, кириллица обеспечена встроенным шрифтом DejaVu.",
+        "operationId": "export_report_pdf_api_v1_reports_monthly_export_pdf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Начало отчётного периода включительно.",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало отчётного периода включительно."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Конец отчётного периода включительно.",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец отчётного периода включительно."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Отчёт успешно сформирован.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/forecast": {
       "get": {
         "tags": [

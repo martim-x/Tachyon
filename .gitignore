@@ -29,3 +29,6 @@ test_budget_db
 
 # CI artifacts
 bandit-report.json
+# Сборочные артефакты
+build/
+dist/
