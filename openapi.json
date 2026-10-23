@@ -1,0 +1,3464 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tachyon",
+    "description": "Многопользовательский трекер доходов и расходов. Все защищённые маршруты используют JWT Bearer.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/budget-limits": {
+      "get": {
+        "tags": [
+          "Бюджет"
+        ],
+        "summary": "Получить бюджетные лимиты",
+        "description": "Возвращает все бюджетные лимиты текущего пользователя. Если лимитов нет, возвращается пустой список.",
+        "operationId": "limits_list_api_v1_budget_limits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LimitRead"
+                  },
+                  "type": "array",
+                  "title": "Response Limits List Api V1 Budget Limits Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Бюджет"
+        ],
+        "summary": "Создать бюджетный лимит",
+        "description": "Создаёт месячный лимит расходов для категории текущего пользователя. Для одной категории допускается только один лимит на месяц.",
+        "operationId": "create_limit_api_v1_budget_limits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт с текущим состоянием данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/budget-limits/{category_id}": {
+      "put": {
+        "tags": [
+          "Бюджет"
+        ],
+        "summary": "Изменить бюджетный лимит",
+        "description": "Изменяет размер лимита для категории и указанного месяца. Чужой или несуществующий лимит возвращает одинаковую ошибку 404.",
+        "operationId": "update_limit_api_v1_budget_limits__category_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор категории, для которой установлен лимит.",
+              "title": "Category Id"
+            },
+            "description": "Идентификатор категории, для которой установлен лимит."
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Месяц действия лимита. Допускается любая дата месяца; она нормализуется к первому числу.",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "Month"
+            },
+            "description": "Месяц действия лимита. Допускается любая дата месяца; она нормализуется к первому числу."
+          },
+          {
+            "name": "limit_amount_cents",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Новый размер лимита в целых копейках.",
+              "examples": [
+                500000
+              ],
+              "title": "Limit Amount Cents"
+            },
+            "description": "Новый размер лимита в целых копейках."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget-limits/status": {
+      "get": {
+        "tags": [
+          "Бюджет"
+        ],
+        "summary": "Получить состояние бюджетных лимитов",
+        "description": "Возвращает фактические расходы, остаток и прогноз для каждого бюджетного лимита текущего пользователя. Если лимитов нет, возвращается пустой список.",
+        "operationId": "get_statuses_api_v1_budget_limits_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LimitStatusDTO"
+                  },
+                  "type": "array",
+                  "title": "Response Get Statuses Api V1 Budget Limits Status Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Авторизация"
+        ],
+        "summary": "Зарегистрировать пользователя",
+        "description": "Создаёт пользователя с уникальным email. Пароль сохраняется только как bcrypt-хеш.",
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт с текущим состоянием данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Авторизация"
+        ],
+        "summary": "Войти в систему",
+        "description": "Проверяет email и пароль и возвращает JWT access-токен.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Авторизация"
+        ],
+        "summary": "Получить текущего пользователя",
+        "description": "Возвращает пользователя из Bearer JWT.",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/operations": {
+      "post": {
+        "tags": [
+          "Операции"
+        ],
+        "summary": "Создать операцию",
+        "description": "Создаёт доход или расход текущего пользователя. Сумма передаётся как Decimal с двумя знаками.",
+        "operationId": "create_operation_api_v1_operations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Операции"
+        ],
+        "summary": "Получить список операций",
+        "description": "Возвращает страницу операций текущего пользователя с фильтрами по датам, категории и типу.",
+        "operationId": "list_operations_api_v1_operations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Начало периода включительно",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало периода включительно"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Конец периода включительно",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец периода включительно"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по категории",
+              "title": "Category Id"
+            },
+            "description": "Фильтр по категории"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "income",
+                    "expense"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по типу операции",
+              "title": "Type"
+            },
+            "description": "Фильтр по типу операции"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Номер страницы",
+              "examples": [
+                1
+              ],
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Номер страницы"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Количество элементов на странице",
+              "examples": [
+                20
+              ],
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Количество элементов на странице"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationPageDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{operation_id}": {
+      "get": {
+        "tags": [
+          "Операции"
+        ],
+        "summary": "Получить операцию",
+        "description": "Возвращает операцию текущего пользователя. Чужая и отсутствующая операция дают одинаковый 404.",
+        "operationId": "get_operation_api_v1_operations__operation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор операции",
+              "title": "Operation Id"
+            },
+            "description": "Идентификатор операции"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Операции"
+        ],
+        "summary": "Изменить операцию",
+        "description": "Частично изменяет операцию текущего пользователя.",
+        "operationId": "patch_operation_api_v1_operations__operation_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор операции",
+              "title": "Operation Id"
+            },
+            "description": "Идентификатор операции"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Операции"
+        ],
+        "summary": "Удалить операцию",
+        "description": "Удаляет операцию текущего пользователя.",
+        "operationId": "delete_operation_api_v1_operations__operation_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор операции",
+              "title": "Operation Id"
+            },
+            "description": "Идентификатор операции"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "tags": [
+          "Операции",
+          "Категории"
+        ],
+        "summary": "Получить категории",
+        "description": "Возвращает категории доходов и расходов текущего пользователя.",
+        "operationId": "list_categories_api_v1_categories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryDTO"
+                  },
+                  "type": "array",
+                  "title": "Response List Categories Api V1 Categories Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Операции",
+          "Категории"
+        ],
+        "summary": "Создать категорию",
+        "description": "Создаёт категорию доходов или расходов. Название уникально для текущего пользователя.",
+        "operationId": "create_category_api_v1_categories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт с текущим состоянием данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/categories/{category_id}": {
+      "get": {
+        "tags": [
+          "Операции",
+          "Категории"
+        ],
+        "summary": "Получить категорию",
+        "description": "Возвращает категорию текущего пользователя.",
+        "operationId": "get_category_api_v1_categories__category_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор категории",
+              "title": "Category Id"
+            },
+            "description": "Идентификатор категории"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Операции",
+          "Категории"
+        ],
+        "summary": "Изменить категорию",
+        "description": "Изменяет название или тип категории.",
+        "operationId": "patch_category_api_v1_categories__category_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор категории",
+              "title": "Category Id"
+            },
+            "description": "Идентификатор категории"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт с текущим состоянием данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Операции",
+          "Категории"
+        ],
+        "summary": "Удалить категорию",
+        "description": "Удаляет категорию текущего пользователя.",
+        "operationId": "delete_category_api_v1_categories__category_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор категории",
+              "title": "Category Id"
+            },
+            "description": "Идентификатор категории"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recurring/rules": {
+      "get": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Получить повторяющиеся правила",
+        "description": "Возвращает повторяющиеся правила текущего пользователя. Если правил нет, возвращается пустой список.",
+        "operationId": "list_rules_api_v1_recurring_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringRuleDTO"
+                  },
+                  "type": "array",
+                  "title": "Response List Rules Api V1 Recurring Rules Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Создать повторяющееся правило",
+        "description": "Создаёт правило автоматического формирования расходных операций с ежедневной, еженедельной или ежемесячной периодичностью.",
+        "operationId": "create_rule_api_v1_recurring_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringRuleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringRuleDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recurring/rules/{rule_id}": {
+      "get": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Получить повторяющееся правило",
+        "description": "Возвращает правило текущего пользователя по идентификатору. Чужое и несуществующее правило возвращают одинаковую ошибку 404.",
+        "operationId": "get_rule_api_v1_recurring_rules__rule_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор повторяющегося правила.",
+              "title": "Rule Id"
+            },
+            "description": "Идентификатор повторяющегося правила."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringRuleDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Изменить повторяющееся правило",
+        "description": "Частично изменяет переданные поля повторяющегося правила. Поля note и end_date можно очистить значением null.",
+        "operationId": "update_rule_api_v1_recurring_rules__rule_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор повторяющегося правила.",
+              "title": "Rule Id"
+            },
+            "description": "Идентификатор повторяющегося правила."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringRuleDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Отключить повторяющееся правило",
+        "description": "Выполняет мягкое удаление правила: оно становится неактивным и больше не участвует в автоматической генерации операций.",
+        "operationId": "delete_rule_api_v1_recurring_rules__rule_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор повторяющегося правила.",
+              "title": "Rule Id"
+            },
+            "description": "Идентификатор повторяющегося правила."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recurring/rules/run": {
+      "post": {
+        "tags": [
+          "Повторяющиеся операции"
+        ],
+        "summary": "Запустить генерацию повторяющихся операций",
+        "description": "Запускает правила текущего пользователя вручную. При dry_run=true только показывает будущие выполнения. При обычном запуске выполняет полный catch-up и не создаёт дубли.",
+        "operationId": "run_rules_api_v1_recurring_rules_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRulesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringExecutionDTO"
+                  },
+                  "type": "array",
+                  "title": "Response Run Rules Api V1 Recurring Rules Run Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/reports/monthly": {
+      "get": {
+        "tags": [
+          "Отчёты"
+        ],
+        "summary": "Получить финансовый отчёт",
+        "description": "Возвращает доходы, расходы, баланс, категории и прогноз за указанный период. Для прогноза используется месяц, содержащий большую часть выбранного периода.",
+        "operationId": "monthly_report_api_v1_reports_monthly_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Начало отчётного периода включительно.",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало отчётного периода включительно."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Конец отчётного периода включительно.",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец отчётного периода включительно."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/by-category": {
+      "get": {
+        "tags": [
+          "Отчёты"
+        ],
+        "summary": "Получить расходы по категориям",
+        "description": "Возвращает суммы расходов, процентные доли категорий и сравнение с бюджетными лимитами. Операции без категории попадают в группу «Без категории».",
+        "operationId": "report_by_category_api_v1_reports_by_category_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Начало отчётного периода включительно.",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало отчётного периода включительно."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Конец отчётного периода включительно.",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец отчётного периода включительно."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SeriesPointDTO"
+                  },
+                  "title": "Response Report By Category Api V1 Reports By Category Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/monthly/export": {
+      "get": {
+        "tags": [
+          "Отчёты"
+        ],
+        "summary": "Выгрузить финансовый отчёт",
+        "description": "Формирует Excel-файл за указанный период. Файл содержит листы «Операции», «По категориям» и «Сводка» и использует ту же агрегацию, что и обычный месячный отчёт.",
+        "operationId": "export_monthly_report_api_v1_reports_monthly_export_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Начало отчётного периода включительно.",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало отчётного периода включительно."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Конец отчётного периода включительно.",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец отчётного периода включительно."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "excel",
+                "xlsx"
+              ],
+              "type": "string",
+              "description": "Формат выгружаемого файла.",
+              "examples": [
+                "xlsx"
+              ],
+              "default": "excel",
+              "title": "Format"
+            },
+            "description": "Формат выгружаемого файла."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Отчёт успешно сформирован.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/forecast": {
+      "get": {
+        "tags": [
+          "Прогноз"
+        ],
+        "summary": "Получить прогноз расходов",
+        "description": "Рассчитывает прогноз расходов для месяца YYYY-MM. Для ещё не начавшегося месяца возвращаются нулевые значения и признак низкой достоверности, а не ошибка 404.",
+        "operationId": "forecast_report_api_v1_forecast_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$",
+              "description": "Месяц прогноза в формате YYYY-MM.",
+              "examples": [
+                "2026-10"
+              ],
+              "title": "Month"
+            },
+            "description": "Месяц прогноза в формате YYYY-MM."
+          },
+          {
+            "name": "pace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "WHOLE_MONTH",
+                "RECENT_WINDOW"
+              ],
+              "type": "string",
+              "description": "Стратегия расчёта темпа: весь прошедший месяц или последнее доступное окно.",
+              "examples": [
+                "WHOLE_MONTH"
+              ],
+              "default": "WHOLE_MONTH",
+              "title": "Pace"
+            },
+            "description": "Стратегия расчёта темпа: весь прошедший месяц или последнее доступное окно."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Система"
+        ],
+        "summary": "Проверить состояние приложения",
+        "description": "Возвращает 200, если HTTP-приложение запущено и готово принимать запросы.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CategoryCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Название категории"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Kind",
+            "description": "Тип категории"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "CategoryCreate",
+        "example": {
+          "kind": "expense",
+          "name": "Продукты"
+        }
+      },
+      "CategoryDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "kind",
+          "color",
+          "is_default"
+        ],
+        "title": "CategoryDTO",
+        "example": {
+          "color": "#22AA66",
+          "id": "20000000-0000-0000-0000-000000000001",
+          "is_default": false,
+          "kind": "expense",
+          "name": "Продукты",
+          "user_id": "10000000-0000-0000-0000-000000000001"
+        }
+      },
+      "CategoryUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Новое название категории"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "income",
+                  "expense"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Новый тип категории"
+          }
+        },
+        "type": "object",
+        "title": "CategoryUpdate",
+        "example": {
+          "name": "Супермаркеты"
+        }
+      },
+      "ErrorContent": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorContent",
+        "description": "Машиночитаемое содержимое ошибки."
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "issue": {
+            "type": "string",
+            "title": "Issue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "issue"
+        ],
+        "title": "ErrorDetail",
+        "description": "Описание одного некорректного поля.",
+        "example": {
+          "field": "amount",
+          "issue": "Значение должно быть больше нуля"
+        }
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "Единый контракт ошибки API.",
+        "example": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "detail": [
+              {
+                "field": "amount",
+                "issue": "Значение должно быть больше нуля"
+              }
+            ],
+            "message": "Проверка данных не пройдена"
+          }
+        }
+      },
+      "ForecastDTO": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year",
+            "description": "Год прогноза.",
+            "examples": [
+              2026
+            ]
+          },
+          "month": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Month",
+            "description": "Номер месяца прогноза.",
+            "examples": [
+              10
+            ]
+          },
+          "pace": {
+            "type": "string",
+            "title": "Pace",
+            "description": "Использованная стратегия расчёта темпа.",
+            "examples": [
+              "WHOLE_MONTH"
+            ]
+          },
+          "days_in_month": {
+            "type": "integer",
+            "maximum": 31.0,
+            "minimum": 28.0,
+            "title": "Days In Month",
+            "description": "Количество календарных дней в месяце."
+          },
+          "days_elapsed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Days Elapsed",
+            "description": "Количество прошедших дней месяца."
+          },
+          "days_remaining": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Days Remaining",
+            "description": "Количество оставшихся дней месяца."
+          },
+          "spent_to_date": {
+            "type": "string",
+            "title": "Spent To Date",
+            "description": "Фактические расходы на дату расчёта.",
+            "examples": [
+              "700.00"
+            ]
+          },
+          "daily_rate": {
+            "type": "string",
+            "title": "Daily Rate",
+            "description": "Средний дневной темп расходов.",
+            "examples": [
+              "46.67"
+            ]
+          },
+          "projected_total": {
+            "type": "string",
+            "title": "Projected Total",
+            "description": "Прогнозируемые расходы к окончанию месяца.",
+            "examples": [
+              "1446.67"
+            ]
+          },
+          "low_confidence": {
+            "type": "boolean",
+            "title": "Low Confidence",
+            "description": "Признак низкой достоверности из-за недостаточного количества данных."
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "pace",
+          "days_in_month",
+          "days_elapsed",
+          "days_remaining",
+          "spent_to_date",
+          "daily_rate",
+          "projected_total",
+          "low_confidence"
+        ],
+        "title": "ForecastDTO",
+        "description": "Прогноз расходов на выбранный месяц.",
+        "examples": [
+          {
+            "daily_rate": "46.67",
+            "days_elapsed": 15,
+            "days_in_month": 31,
+            "days_remaining": 16,
+            "low_confidence": false,
+            "month": 10,
+            "pace": "WHOLE_MONTH",
+            "projected_total": "1446.67",
+            "spent_to_date": "700.00",
+            "year": 2026
+          }
+        ]
+      },
+      "LimitCreate": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Идентификатор категории пользователя."
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "title": "Month",
+            "description": "Месяц действия лимита. Допускается любая дата месяца; она нормализуется к первому числу."
+          },
+          "limit_amount_cents": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit Amount Cents",
+            "description": "Размер лимита в целых копейках.",
+            "examples": [
+              500000
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "month",
+          "limit_amount_cents"
+        ],
+        "title": "LimitCreate",
+        "description": "Данные для создания месячного лимита категории.",
+        "examples": [
+          {
+            "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
+            "limit_amount_cents": 500000,
+            "month": "2026-10-01"
+          }
+        ]
+      },
+      "LimitRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id",
+            "description": "Идентификатор владельца лимита."
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Идентификатор категории."
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "title": "Month",
+            "description": "Первый день месяца действия лимита."
+          },
+          "limit_amount_cents": {
+            "type": "integer",
+            "title": "Limit Amount Cents",
+            "description": "Размер лимита в целых копейках."
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "category_id",
+          "month",
+          "limit_amount_cents"
+        ],
+        "title": "LimitRead",
+        "description": "Созданный бюджетный лимит.",
+        "examples": [
+          {
+            "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
+            "limit_amount_cents": 500000,
+            "month": "2026-10-01",
+            "user_id": "592b92be-7dde-42c3-a311-ce535b26a3dc"
+          }
+        ]
+      },
+      "LimitStatusDTO": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Идентификатор категории."
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "title": "Month",
+            "description": "Первый день месяца действия лимита."
+          },
+          "limit_amount_cents": {
+            "type": "integer",
+            "title": "Limit Amount Cents",
+            "description": "Размер лимита в целых копейках."
+          },
+          "spent_amount_cents": {
+            "type": "integer",
+            "title": "Spent Amount Cents",
+            "description": "Фактические расходы в целых копейках."
+          },
+          "remaining_amount_cents": {
+            "type": "integer",
+            "title": "Remaining Amount Cents",
+            "description": "Остаток лимита в целых копейках."
+          },
+          "projected_amount_cents": {
+            "type": "integer",
+            "title": "Projected Amount Cents",
+            "description": "Прогноз расходов к окончанию месяца в целых копейках."
+          },
+          "percent": {
+            "type": "string",
+            "title": "Percent",
+            "description": "Доля использованного лимита без потери точности.",
+            "examples": [
+              "0.7000"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "WARNING",
+              "EXCEEDED",
+              "EXCEEDED_PROJECTED"
+            ],
+            "title": "Status",
+            "description": "Состояние лимита: OK, WARNING, EXCEEDED или EXCEEDED_PROJECTED."
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "month",
+          "limit_amount_cents",
+          "spent_amount_cents",
+          "remaining_amount_cents",
+          "projected_amount_cents",
+          "percent",
+          "status"
+        ],
+        "title": "LimitStatusDTO",
+        "description": "Фактическое и прогнозируемое состояние бюджетного лимита.",
+        "examples": [
+          {
+            "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
+            "limit_amount_cents": 100000,
+            "month": "2026-10-01",
+            "percent": "0.7000",
+            "projected_amount_cents": 144667,
+            "remaining_amount_cents": 30000,
+            "spent_amount_cents": 70000,
+            "status": "EXCEEDED_PROJECTED"
+          }
+        ]
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email зарегистрированного пользователя"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "description": "Пароль пользователя"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "example": {
+          "email": "user@example.com",
+          "password": "secure-password-123"
+        }
+      },
+      "OperationCreate": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Категория операции"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount",
+            "description": "Сумма операции с двумя знаками"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Kind",
+            "description": "Тип операции: income или expense"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At",
+            "description": "Дата и время операции с часовым поясом; по умолчанию используется текущее время"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Комментарий к операции"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "amount",
+          "kind"
+        ],
+        "title": "OperationCreate",
+        "example": {
+          "amount": "1250.50",
+          "category_id": "20000000-0000-0000-0000-000000000001",
+          "kind": "expense",
+          "note": "Покупка продуктов",
+          "occurred_at": "2026-10-15T12:00:00+00:00"
+        }
+      },
+      "OperationDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Сумма операции"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Kind"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "category_id",
+          "amount",
+          "kind",
+          "occurred_at",
+          "note",
+          "source"
+        ],
+        "title": "OperationDTO",
+        "example": {
+          "amount": "1250.50",
+          "category_id": "20000000-0000-0000-0000-000000000001",
+          "id": "30000000-0000-0000-0000-000000000001",
+          "kind": "expense",
+          "note": "Покупка продуктов",
+          "occurred_at": "2026-10-15T12:00:00+00:00",
+          "source": "manual",
+          "user_id": "10000000-0000-0000-0000-000000000001"
+        }
+      },
+      "OperationPageDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OperationDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Общее количество операций"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page",
+            "description": "Номер текущей страницы"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Размер страницы"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "limit"
+        ],
+        "title": "OperationPageDTO",
+        "example": {
+          "items": [],
+          "limit": 20,
+          "page": 1,
+          "total": 0
+        }
+      },
+      "OperationUpdate": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id",
+            "description": "Новая категория операции"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Новая сумма операции"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "income",
+                  "expense"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Новый тип операции"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At",
+            "description": "Новая дата и время операции"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Новый комментарий"
+          }
+        },
+        "type": "object",
+        "title": "OperationUpdate",
+        "example": {
+          "amount": "1400.00",
+          "note": "Уточнённая сумма"
+        }
+      },
+      "RecurringExecutionDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Идентификатор запуска."
+          },
+          "rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Rule Id",
+            "description": "Идентификатор обработанного правила."
+          },
+          "period_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Date",
+            "description": "Период, за который была создана операция."
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id",
+            "description": "Идентификатор созданной операции. При предварительном просмотре может отсутствовать."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_id",
+          "period_date",
+          "operation_id"
+        ],
+        "title": "RecurringExecutionDTO",
+        "description": "Результат одного выполнения повторяющегося правила.",
+        "examples": [
+          {
+            "id": "f8df1fa8-c94f-4b45-9d56-13e401f60ed8",
+            "operation_id": "cb8c1070-e789-40fb-83b5-bffed44ca11a",
+            "period_date": "2026-10-01",
+            "rule_id": "2635e13c-cb52-4ed4-88ea-228604caea20"
+          }
+        ]
+      },
+      "RecurringRuleCreate": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Категория создаваемых операций."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Kind",
+            "description": "Периодичность: ежедневно, еженедельно или ежемесячно.",
+            "examples": [
+              "monthly"
+            ]
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Interval",
+            "description": "Количество периодов между запусками.",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "amount_cents": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Cents",
+            "description": "Сумма создаваемой операции в целых копейках.",
+            "examples": [
+              150000
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Примечание, добавляемое к операции.",
+            "examples": [
+              "Аренда квартиры"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date",
+            "description": "Дата первого выполнения правила.",
+            "examples": [
+              "2026-10-01"
+            ]
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date",
+            "description": "Последняя допустимая дата выполнения правила.",
+            "examples": [
+              "2027-10-01"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "kind",
+          "amount_cents",
+          "start_date"
+        ],
+        "title": "RecurringRuleCreate",
+        "description": "Данные для создания повторяющегося правила.",
+        "examples": [
+          {
+            "amount_cents": 150000,
+            "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
+            "end_date": "2027-10-01",
+            "interval": 1,
+            "kind": "monthly",
+            "note": "Аренда квартиры",
+            "start_date": "2026-10-01"
+          }
+        ]
+      },
+      "RecurringRuleDTO": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Категория создаваемых операций."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Kind",
+            "description": "Периодичность: ежедневно, еженедельно или ежемесячно.",
+            "examples": [
+              "monthly"
+            ]
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Interval",
+            "description": "Количество периодов между запусками.",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "amount_cents": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Cents",
+            "description": "Сумма создаваемой операции в целых копейках.",
+            "examples": [
+              150000
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Примечание, добавляемое к операции.",
+            "examples": [
+              "Аренда квартиры"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date",
+            "description": "Дата первого выполнения правила.",
+            "examples": [
+              "2026-10-01"
+            ]
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date",
+            "description": "Последняя допустимая дата выполнения правила.",
+            "examples": [
+              "2027-10-01"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Идентификатор правила."
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id",
+            "description": "Идентификатор владельца правила."
+          },
+          "next_run_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Run At",
+            "description": "Дата и время следующего выполнения."
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At",
+            "description": "Дата и время последнего выполнения."
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Признак активности правила."
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "kind",
+          "amount_cents",
+          "start_date",
+          "id",
+          "user_id",
+          "next_run_at",
+          "last_run_at",
+          "is_active"
+        ],
+        "title": "RecurringRuleDTO",
+        "description": "Повторяющееся правило в ответе API.",
+        "examples": [
+          {
+            "amount_cents": 150000,
+            "category_id": "34fc6d84-72c0-4ac4-a201-34cf9869ab63",
+            "end_date": "2027-10-01",
+            "id": "2635e13c-cb52-4ed4-88ea-228604caea20",
+            "interval": 1,
+            "is_active": true,
+            "kind": "monthly",
+            "last_run_at": "2026-10-01T12:00:00Z",
+            "next_run_at": "2026-11-01T12:00:00Z",
+            "note": "Аренда квартиры",
+            "start_date": "2026-10-01",
+            "user_id": "592b92be-7dde-42c3-a311-ce535b26a3dc"
+          }
+        ]
+      },
+      "RecurringRuleUpdate": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id",
+            "description": "Новая категория создаваемых операций."
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "monthly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Новая периодичность правила."
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval",
+            "description": "Новое количество периодов между запусками."
+          },
+          "amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Cents",
+            "description": "Новая сумма операции в целых копейках."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Новое примечание. null очищает примечание."
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date",
+            "description": "Новая дата начала действия правила."
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date",
+            "description": "Новая дата окончания. null снимает ограничение."
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "description": "Признак активности правила."
+          }
+        },
+        "type": "object",
+        "title": "RecurringRuleUpdate",
+        "description": "Изменяемые поля повторяющегося правила.",
+        "examples": [
+          {
+            "amount_cents": 160000,
+            "is_active": true,
+            "note": "Аренда после индексации"
+          }
+        ]
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Уникальный email пользователя"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "Password",
+            "description": "Пароль длиной не менее 8 символов и не более 72 байт UTF-8"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest",
+        "example": {
+          "email": "user@example.com",
+          "password": "secure-password-123"
+        }
+      },
+      "ReportDTO": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From",
+            "description": "Начало отчётного периода включительно"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To",
+            "description": "Конец отчётного периода включительно"
+          },
+          "income": {
+            "type": "string",
+            "title": "Income",
+            "description": "Доходы за период"
+          },
+          "expense": {
+            "type": "string",
+            "title": "Expense",
+            "description": "Расходы за период"
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "Доходы минус расходы"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPointDTO"
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Разбивка расходов по категориям"
+          },
+          "forecast": {
+            "type": "string",
+            "title": "Forecast",
+            "description": "Прогноз расходов для выбранного месяца"
+          },
+          "forecast_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Forecast Month",
+            "description": "Месяц, использованный для прогноза"
+          },
+          "forecast_basis": {
+            "type": "string",
+            "const": "dominant_period_month",
+            "title": "Forecast Basis",
+            "description": "Прогноз рассчитан по месяцу, содержащему большую часть периода",
+            "default": "dominant_period_month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "income",
+          "expense",
+          "balance",
+          "categories",
+          "forecast",
+          "forecast_month"
+        ],
+        "title": "ReportDTO",
+        "description": "Полный финансовый отчёт за период.",
+        "example": {
+          "balance": "30000.00",
+          "categories": [],
+          "date_from": "2026-10-01",
+          "date_to": "2026-10-31",
+          "expense": "20000.00",
+          "forecast": "21333.33",
+          "forecast_basis": "dominant_period_month",
+          "forecast_month": "2026-10",
+          "income": "50000.00"
+        }
+      },
+      "RunRulesRequest": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From",
+            "description": "Начало диапазона предварительного просмотра. Реальный запуск всегда выполняет полный catch-up.",
+            "examples": [
+              "2026-10-01"
+            ]
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To",
+            "description": "Конец диапазона включительно.",
+            "examples": [
+              "2026-10-31"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Если true, возвращает планируемые операции, но ничего не записывает в базу данных.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RunRulesRequest",
+        "description": "Параметры ручного запуска повторяющихся правил.",
+        "examples": [
+          {
+            "dry_run": true,
+            "from": "2026-10-01",
+            "to": "2026-10-31"
+          }
+        ]
+      },
+      "SeriesPointDTO": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id",
+            "description": "Идентификатор категории или null для «Без категории»"
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name",
+            "description": "Название категории"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Сумма расходов категории"
+          },
+          "share_percent": {
+            "type": "string",
+            "title": "Share Percent",
+            "description": "Доля категории в расходах, %"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "Лимит категории в выбранном месяце"
+          },
+          "limit_remaining": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Remaining",
+            "description": "Остаток лимита; отрицательный при превышении"
+          },
+          "limit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Percent",
+            "description": "Использованная доля лимита, %"
+          },
+          "limit_exceeded": {
+            "type": "boolean",
+            "title": "Limit Exceeded",
+            "description": "Достигнут или превышен лимит"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "category_name",
+          "amount",
+          "share_percent",
+          "limit_exceeded"
+        ],
+        "title": "SeriesPointDTO",
+        "description": "Одна категория для отчёта или диаграммы.",
+        "example": {
+          "amount": "1250.50",
+          "category_id": "10000000-0000-0000-0000-000000000001",
+          "category_name": "Продукты",
+          "limit": "2000.00",
+          "limit_exceeded": false,
+          "limit_percent": "62.53",
+          "limit_remaining": "749.50",
+          "share_percent": "62.53"
+        }
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token",
+            "description": "JWT access-токен"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "title": "Token Type",
+            "description": "Схема авторизации",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "TokenResponse",
+        "example": {
+          "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+          "token_type": "bearer"
+        }
+      },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Идентификатор пользователя"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email пользователя"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserResponse",
+        "example": {
+          "email": "user@example.com",
+          "id": "10000000-0000-0000-0000-000000000001"
+        }
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Авторизация",
+      "description": "Регистрация, вход по email и паролю и получение текущего пользователя."
+    },
+    {
+      "name": "Операции",
+      "description": "Доходы и расходы текущего пользователя."
+    },
+    {
+      "name": "Категории",
+      "description": "Категории доходов и расходов."
+    },
+    {
+      "name": "Бюджет",
+      "description": "Месячные лимиты расходов и их текущее состояние."
+    },
+    {
+      "name": "Повторяющиеся операции",
+      "description": "Правила автоматического создания операций и их ручной запуск."
+    },
+    {
+      "name": "Отчёты",
+      "description": "Финансовые отчёты, аналитика по категориям и экспорт."
+    },
+    {
+      "name": "Прогноз",
+      "description": "Прогноз расходов до окончания выбранного месяца."
+    },
+    {
+      "name": "Система",
+      "description": "Служебные маршруты состояния приложения."
+    }
+  ]
+}
