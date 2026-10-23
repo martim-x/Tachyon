@@ -74,6 +74,25 @@ def _write_headers(
     _set_widths(sheet, widths)
 
 
+def _set_text(
+    sheet: Worksheet,
+    row: int,
+    column: int,
+    text: str,
+) -> None:
+    """Пользовательский текст пишется строкой, а не формулой (CWE-1236).
+
+    openpyxl объявляет значением формулу любую строку, начинающуюся с «=»:
+    категория имени «=HYPERLINK(...)» ушла бы в файл живой формулой и
+    выполнилась при открытии выгрузки. data_type = «s» принудительно
+    сохраняет исходный текст.
+    """
+
+    cell = sheet.cell(row=row, column=column, value=text)
+    if cell.data_type != "s":
+        cell.data_type = "s"
+
+
 def _set_money(
     sheet: Worksheet,
     row: int,
@@ -114,7 +133,7 @@ def _fill_operations_sheet(
         date_cell = sheet.cell(row=row, column=1, value=operation.occurred_on)
         date_cell.number_format = DATE_CELL_FORMAT
 
-        sheet.cell(row=row, column=2, value=operation.category_name)
+        _set_text(sheet, row, 2, operation.category_name)
         sheet.cell(row=row, column=3, value=KIND_LABELS[operation.kind])
         _set_money(sheet, row, 4, operation.amount)
 
@@ -128,7 +147,7 @@ def _fill_categories_sheet(
     for offset, category in enumerate(categories, start=1):
         row = offset + 1
 
-        sheet.cell(row=row, column=1, value=category.category_name)
+        _set_text(sheet, row, 1, category.category_name)
         _set_money(sheet, row, 2, category.amount)
         _set_percent(sheet, row, 3, category.share_percent)
         _set_money(sheet, row, 4, category.limit)

