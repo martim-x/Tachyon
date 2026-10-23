@@ -7,7 +7,11 @@ from sqlalchemy import and_, select
 from app.core.persistence.scoped_repository import ScopedRepository
 from app.domains.budget.models import BudgetLimit
 from app.domains.ledger.models import Category, Operation
-from app.domains.reporting.queries import ReportRow
+from app.domains.reporting.queries import (
+    UNCATEGORIZED_NAME,
+    ReportOperationRow,
+    ReportRow,
+)
 
 
 def day_start(day: date) -> datetime:
@@ -95,6 +99,65 @@ class ReportingRepository(ScopedRepository[Operation]):
                 kind=str(row["kind"]),
                 amount_cents=int(row["amount_cents"]),
                 limit_cents=(None if row["limit_cents"] is None else int(row["limit_cents"])),
+            )
+            for row in result.mappings().all()
+        ]
+
+    async def period_operations(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+    ) -> list[ReportOperationRow]:
+        """Построчные операции периода для листа «Операции» выгрузки.
+
+        Запрос read-only и ограничен тем же `_scoped()`, что и агрегация:
+        чужие операции физически не попадают в выборку. Границы периода и
+        обход date.max совпадают с `period_rows`, чтобы лист и сводка
+        exporter'а не расходились.
+        """
+
+        scoped_query = self._scoped().where(
+            Operation.occurred_at >= day_start(date_from),
+        )
+
+        if date_to < date.max:
+            period_end = date_to + timedelta(days=1)
+            scoped_query = scoped_query.where(
+                Operation.occurred_at < day_start(period_end),
+            )
+
+        scoped_operations = scoped_query.subquery()
+
+        statement = (
+            select(
+                scoped_operations.c.occurred_at,
+                Category.name.label("category_name"),
+                scoped_operations.c.kind,
+                scoped_operations.c.amount_cents,
+            )
+            .select_from(scoped_operations)
+            .outerjoin(
+                Category,
+                and_(
+                    Category.id == scoped_operations.c.category_id,
+                    Category.user_id == scoped_operations.c.user_id,
+                ),
+            )
+            .order_by(
+                scoped_operations.c.occurred_at,
+                scoped_operations.c.id,
+            )
+        )
+
+        result = await self._session.execute(statement)
+
+        return [
+            ReportOperationRow(
+                occurred_at=row["occurred_at"],
+                category_name=row["category_name"] or UNCATEGORIZED_NAME,
+                kind=str(row["kind"]),
+                amount_cents=int(row["amount_cents"]),
             )
             for row in result.mappings().all()
         ]

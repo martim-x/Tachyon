@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
@@ -43,6 +44,16 @@ class CategoryAggregate:
     limit_remaining: Decimal | None
     limit_percent: Decimal | None
     limit_exceeded: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReportOperationRow:
+    """Одна операция периода для листа «Операции» выгрузки."""
+
+    occurred_at: datetime
+    category_name: str
+    kind: str
+    amount_cents: int
 
 
 @dataclass(frozen=True, slots=True)
