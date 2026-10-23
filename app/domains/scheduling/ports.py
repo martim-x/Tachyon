@@ -10,8 +10,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import Clock, SystemClock
 from app.core.money import Money
 from app.core.user_context import user_scope
+from app.infrastructure.event_handlers import evaluate_budget_notifications
 
 
 class OperationWriter(Protocol):
@@ -44,6 +46,7 @@ async def create_operation_impl(
     recurring_execution_id: UUID,
     note: str | None = None,
     source: str = "recurring",
+    clock: Clock | None = None,
 ) -> UUID:
     """Реализация порта через репозиторий домена ledger."""
 
@@ -63,5 +66,12 @@ async def create_operation_impl(
             note=note,
             source=source,
         )
+
+    await evaluate_budget_notifications(
+        session=session,
+        user_id=user_id,
+        month=operation.occurred_at.date(),
+        clock=clock or SystemClock(),
+    )
 
     return operation.id
