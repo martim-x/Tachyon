@@ -160,17 +160,25 @@ class NotificationService:
             if isinstance(item, dict) and "category_id" in item
         }
 
-        new_category_added = False
+        new_categories: list[ThresholdCategory] = []
 
-        for item in self._category_payload(
+        category_payload = self._category_payload(
             categories,
+        )
+
+        for category, item in zip(
+            categories,
+            category_payload,
+            strict=True,
         ):
             category_id = str(
                 item["category_id"],
             )
 
             if category_id not in categories_by_id:
-                new_category_added = True
+                new_categories.append(
+                    category,
+                )
 
             categories_by_id[category_id] = item
 
@@ -185,16 +193,16 @@ class NotificationService:
 
         # Прочитанное уведомление возвращается только при появлении
         # новой категории, впервые достигшей того же порога.
-        if new_category_added:
+        if new_categories:
             notification.is_read = False
 
         await self._session.flush()
 
-        if new_category_added:
-            # Новая категория является новым фактом превышения.
+        if new_categories:
+            # В лог попадают только впервые добавленные категории.
             self._log_exceeded(
                 notification,
-                categories,
+                tuple(new_categories),
             )
 
             await self._notifier.send(

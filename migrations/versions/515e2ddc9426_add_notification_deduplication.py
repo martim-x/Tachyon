@@ -63,17 +63,21 @@ def upgrade() -> None:
     )
 
     # Новейшая строка сохраняется, более старые дубли удаляются.
-    rows = connection.execute(
-        sa.select(
-            notifications.c.id,
-            notifications.c.user_id,
-            notifications.c.type,
-            notifications.c.created_at,
-        ).order_by(
-            notifications.c.created_at.desc(),
-            notifications.c.id.desc(),
+    rows = (
+        connection.execute(
+            sa.select(
+                notifications.c.id,
+                notifications.c.user_id,
+                notifications.c.type,
+                notifications.c.created_at,
+            ).order_by(
+                notifications.c.created_at.desc(),
+                notifications.c.id.desc(),
+            )
         )
-    ).mappings()
+        .mappings()
+        .all()
+    )
 
     seen: set[tuple[str, object, str]] = set()
 

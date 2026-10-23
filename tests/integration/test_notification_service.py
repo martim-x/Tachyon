@@ -283,3 +283,56 @@ async def test_same_threshold_is_isolated_between_users(
         first_user.id,
         second_user.id,
     }
+
+
+async def test_exceeded_log_contains_only_new_categories(
+    session: AsyncSession,
+    user_factory: UserFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    user, _token = await user_factory()
+    service = NotificationService(session)
+
+    products = category(
+        name="Продукты",
+        spent=100000,
+    )
+    transport = category(
+        name="Транспорт",
+        spent=120000,
+    )
+
+    with caplog.at_level(
+        logging.WARNING,
+        logger="app.domains.notification.service",
+    ):
+        await service.handle_budget_threshold(
+            threshold_event(
+                user_id=user.id,
+                threshold="EXCEEDED",
+                categories=(products,),
+            )
+        )
+
+        await service.handle_budget_threshold(
+            threshold_event(
+                user_id=user.id,
+                threshold="EXCEEDED",
+                categories=(
+                    products,
+                    transport,
+                ),
+            )
+        )
+
+    exceeded_records = [
+        record for record in caplog.records if record.getMessage() == "budget_limit_exceeded"
+    ]
+
+    assert len(exceeded_records) == 2
+    assert exceeded_records[0].categories == [
+        "Продукты",
+    ]
+    assert exceeded_records[1].categories == [
+        "Транспорт",
+    ]
