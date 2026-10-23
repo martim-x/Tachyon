@@ -1985,6 +1985,161 @@
         }
       }
     },
+    "/dashboard": {
+      "get": {
+        "tags": [
+          "Дашборд"
+        ],
+        "summary": "Страница дашборда",
+        "description": "HTML-дашборд: сводка текущего месяца и последние операции с фильтрами.\n\nСводка это месячный отчёт за текущий месяц (доходы, расходы, остаток\nи прогноз на месяц, docs/03 §S8.1 T1): один вызов ReportingService.monthly\nпо часам ClockDep. Фильтры последнего блока операций - поля\nDashboardFilters (наследует OperationListQuery, как у GET /api/v1/\noperations); те же даты задают период диаграммы TT-29, поэтому при\nсмене периода компонент рендерится заново (docs/03 §S10.1). Анонимный\nзапрос получает 401 от зависимости CurrentUser, как у остального API.",
+        "operationId": "dashboard_page_dashboard_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Начало периода включительно",
+              "examples": [
+                "2026-10-01"
+              ],
+              "title": "From"
+            },
+            "description": "Начало периода включительно"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Конец периода включительно",
+              "examples": [
+                "2026-10-31"
+              ],
+              "title": "To"
+            },
+            "description": "Конец периода включительно"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по категории",
+              "title": "Category Id"
+            },
+            "description": "Фильтр по категории"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "income",
+                    "expense"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Фильтр по типу операции",
+              "title": "Type"
+            },
+            "description": "Фильтр по типу операции"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Номер страницы",
+              "examples": [
+                1
+              ],
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Номер страницы"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Количество элементов на странице",
+              "examples": [
+                20
+              ],
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Количество элементов на странице"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -2318,6 +2473,19 @@
             "year": 2026
           }
         ]
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "LimitCreate": {
         "properties": {
@@ -3505,6 +3673,46 @@
           "email": "user@example.com",
           "id": "10000000-0000-0000-0000-000000000001"
         }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     },
     "securitySchemes": {
