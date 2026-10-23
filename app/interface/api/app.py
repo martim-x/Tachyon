@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -21,6 +22,42 @@ from app.interface.api.exception_handlers import (
 from app.interface.api.routers import api_router
 
 logger = logging.getLogger(__name__)
+
+
+OPENAPI_TAGS: list[dict[str, Any]] = [
+    {
+        "name": "Авторизация",
+        "description": ("Регистрация, вход по email и паролю и получение текущего пользователя."),
+    },
+    {
+        "name": "Операции",
+        "description": ("Доходы и расходы текущего пользователя."),
+    },
+    {
+        "name": "Категории",
+        "description": ("Категории доходов и расходов."),
+    },
+    {
+        "name": "Бюджет",
+        "description": ("Месячные лимиты расходов и их текущее состояние."),
+    },
+    {
+        "name": "Повторяющиеся операции",
+        "description": ("Правила автоматического создания операций и их ручной запуск."),
+    },
+    {
+        "name": "Отчёты",
+        "description": ("Финансовые отчёты, аналитика по категориям и экспорт."),
+    },
+    {
+        "name": "Прогноз",
+        "description": ("Прогноз расходов до окончания выбранного месяца."),
+    },
+    {
+        "name": "Система",
+        "description": ("Служебные маршруты состояния приложения."),
+    },
+]
 
 
 async def generate_due_operations_job() -> None:
@@ -95,15 +132,24 @@ def create_app() -> FastAPI:
 
     application = FastAPI(
         title="Tachyon",
-        description="Многопользовательский трекер доходов и расходов",
+        description=(
+            "Многопользовательский трекер доходов и расходов. "
+            "Все защищённые маршруты используют JWT Bearer."
+        ),
         version="0.1.0",
+        openapi_tags=OPENAPI_TAGS,
         lifespan=application_lifespan,
     )
 
     register_exception_handlers(application)
     application.include_router(api_router)
 
-    @application.get("/health", tags=["Система"])
+    @application.get(
+        "/health",
+        tags=["Система"],
+        summary="Проверить состояние приложения",
+        description=("Возвращает 200, если HTTP-приложение запущено и готово принимать запросы."),
+    )
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
@@ -112,9 +158,15 @@ def create_app() -> FastAPI:
         _request: Request,
         error: Exception,
     ) -> JSONResponse:
-        logger.exception("Unhandled application error: %s", error)
+        logger.exception(
+            "Unhandled application error: %s",
+            error,
+        )
         return JSONResponse(
-            error_body("INTERNAL_ERROR", "Internal server error"),
+            error_body(
+                "INTERNAL_ERROR",
+                "Internal server error",
+            ),
             status_code=500,
         )
 

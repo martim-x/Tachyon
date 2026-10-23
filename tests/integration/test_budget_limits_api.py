@@ -7,7 +7,7 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-URL = "/api/v1/budget_limits"
+URL = "/api/v1/budget-limits"
 MONTH = date(2026, 10, 1).isoformat()
 
 
