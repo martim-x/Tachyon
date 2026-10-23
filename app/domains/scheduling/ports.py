@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock, SystemClock
 from app.core.money import Money
 from app.core.user_context import user_scope
-from app.infrastructure.event_handlers import evaluate_budget_notifications
 
 
 class OperationWriter(Protocol):
@@ -53,6 +52,9 @@ async def create_operation_impl(
     # Локальный импорт сохраняет направление зависимости:
     # scheduling знает только порт, а не реализацию ledger.
     from app.domains.ledger.repository import OperationRepository
+    from app.infrastructure.event_handlers import (
+        evaluate_budget_notifications,
+    )
 
     repository = OperationRepository(session)
 

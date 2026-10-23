@@ -90,16 +90,6 @@ class NotificationService:
         self,
         event: BudgetThresholdReached,
     ) -> Notification:
-        if event.threshold == "EXCEEDED":
-            logger.warning(
-                "budget_limit_exceeded",
-                extra={
-                    "user_id": str(event.user_id),
-                    "month": event.month.isoformat(),
-                    "categories": [category.category_name for category in event.categories],
-                },
-            )
-
         existing = await self._repository.get_for_threshold(
             month=event.month,
             threshold=event.threshold,
@@ -138,6 +128,12 @@ class NotificationService:
                 existing,
                 event.categories,
             )
+
+        # Лог пишется только после фактического создания новой записи.
+        self._log_exceeded(
+            notification,
+            event.categories,
+        )
 
         await self._notifier.send(
             notification,
@@ -195,11 +191,41 @@ class NotificationService:
         await self._session.flush()
 
         if new_category_added:
+            # Новая категория является новым фактом превышения.
+            self._log_exceeded(
+                notification,
+                categories,
+            )
+
             await self._notifier.send(
                 notification,
             )
 
         return notification
+
+    @staticmethod
+    def _log_exceeded(
+        notification: Notification,
+        categories: tuple[
+            ThresholdCategory,
+            ...,
+        ],
+    ) -> None:
+        """Записать в лог только новое фактическое превышение."""
+
+        if notification.type != "EXCEEDED":
+            return
+
+        logger.warning(
+            "budget_limit_exceeded",
+            extra={
+                "user_id": str(
+                    notification.user_id,
+                ),
+                "month": notification.month.isoformat(),
+                "categories": [category.category_name for category in categories],
+            },
+        )
 
     @staticmethod
     def _category_payload(
@@ -210,7 +236,9 @@ class NotificationService:
     ) -> list[dict[str, object]]:
         return [
             {
-                "category_id": str(category.category_id),
+                "category_id": str(
+                    category.category_id,
+                ),
                 "category_name": category.category_name,
                 "spent_amount_cents": (category.spent_amount_cents),
                 "limit_amount_cents": (category.limit_amount_cents),

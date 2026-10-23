@@ -82,6 +82,8 @@ async def test_dashboard_shows_only_own_notifications(
     assert 'hx-swap="outerHTML"' in response.text
     assert "1200.00 ₽" in response.text
     assert "1000.00 ₽" in response.text
+    assert 'integrity="sha384-' in response.text
+    assert 'crossorigin="anonymous"' in response.text
 
 
 async def test_empty_dashboard_has_message(

@@ -223,23 +223,28 @@ async def test_exceeded_event_is_written_to_log(
     user, _token = await user_factory()
     service = NotificationService(session)
 
+    event = threshold_event(
+        user_id=user.id,
+        threshold="EXCEEDED",
+        categories=(
+            category(
+                spent=100000,
+            ),
+        ),
+    )
+
     with caplog.at_level(
         logging.WARNING,
         logger="app.domains.notification.service",
     ):
         await service.handle_budget_threshold(
-            threshold_event(
-                user_id=user.id,
-                threshold="EXCEEDED",
-                categories=(
-                    category(
-                        spent=100000,
-                    ),
-                ),
-            )
+            event,
+        )
+        await service.handle_budget_threshold(
+            event,
         )
 
-    assert "budget_limit_exceeded" in caplog.text
+    assert caplog.text.count("budget_limit_exceeded") == 1
 
 
 async def test_same_threshold_is_isolated_between_users(
