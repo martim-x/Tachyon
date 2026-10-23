@@ -64,6 +64,16 @@ _MONEY_QUANTUM = Decimal("0.01")
 _PERCENT_QUANTUM = Decimal("0.01")
 
 
+def _escape_markup(text: str) -> str:
+    """Экранировать & < > для Paragraph (он разбирает вход как разметку).
+
+    Ручная замена вместо xml.sax.saxutils.escape: saxutils попадает в
+    bandit-чёрный список парсеров XML (B406), хотя здесь только строки.
+    """
+
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _register_cyrillic_font(candidates: tuple[Path, ...], font_name: str) -> str:
     """Зарегистрировать кириллический шрифт один раз за процесс.
 
@@ -134,6 +144,22 @@ def _period_style() -> ParagraphStyle:
     )
 
 
+def _category_name_style() -> ParagraphStyle:
+    """Стиль названий категорий: перенос длинных строк внутри ячейки.
+
+    reportlab не переносит plain-string ячейки, поэтому свободный текст
+    пользователя рисуется Paragraph-ом: даже имя на 100 символов
+    переносится и не наезжает на соседнюю колонку.
+    """
+
+    return ParagraphStyle(
+        name="CategoryName",
+        fontName=_FONT,
+        fontSize=9,
+        leading=11,
+    )
+
+
 def _table_style() -> TableStyle:
     """Сетка: шапка и колонка имён - кириллица, числа данных - Helvetica."""
 
@@ -172,11 +198,15 @@ def _summary_rows(report: ReportDTO) -> list[list[str]]:
     ]
 
 
-def _category_rows(report: ReportDTO) -> list[list[str]]:
+def _category_rows(report: ReportDTO) -> list[list[Any]]:
     """Строки таблицы категорий; суммы и доли - строки Decimal.
 
-    Категория без лимита даёт пустые ячейки вместо прочерков:
-    значение отсутствует, а не равно нулю.
+    Название категории свободное, поэтому рисуется Paragraph-ом с
+    переносом и экранированием (Paragraph разбирает вход как разметку,
+    имя вида "A & B" иначе исказило бы рендер). Числовые ячейки -
+    plain-строки: точные значения из Decimal. Категория без лимита
+    даёт пустые ячейки вместо прочерков: значение отсутствует,
+    а не равно нулю.
     """
 
     header = [
@@ -187,7 +217,7 @@ def _category_rows(report: ReportDTO) -> list[list[str]]:
         "Остаток",
         "Лимит, %",
     ]
-    rows: list[list[str]] = [header]
+    rows: list[list[Any]] = [header]
 
     for category in report.categories:
         limit_text = "" if category.limit is None else format_money(category.limit)
@@ -201,7 +231,10 @@ def _category_rows(report: ReportDTO) -> list[list[str]]:
         )
         rows.append(
             [
-                category.category_name,
+                Paragraph(
+                    _escape_markup(category.category_name),
+                    _category_name_style(),
+                ),
                 format_money(category.amount),
                 format_percent(category.share_percent),
                 limit_text,
