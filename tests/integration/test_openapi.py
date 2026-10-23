@@ -28,6 +28,7 @@ EXPECTED_TAGS = {
     "Отчёты",
     "Прогноз",
     "Система",
+    "Уведомления",
 }
 
 EXPECTED_API_ROUTES = {
@@ -58,6 +59,8 @@ EXPECTED_API_ROUTES = {
     ("GET", "/api/v1/reports/by-category"),
     ("GET", "/api/v1/reports/monthly/export"),
     ("GET", "/api/v1/forecast"),
+    ("GET", "/api/v1/notifications"),
+    ("PATCH", "/api/v1/notifications/{notification_id}/read"),
 }
 
 OPENAPI_PATH = Path(__file__).resolve().parents[2] / "openapi.json"

@@ -1,6 +1,7 @@
 """Доступ к уведомлениям текущего пользователя."""
 
 from datetime import date
+from uuid import UUID
 
 from app.core.persistence.scoped_repository import ScopedRepository
 from app.domains.notification.models import Notification
@@ -52,3 +53,17 @@ class NotificationRepository(
         return list(
             result.scalars().all(),
         )
+
+    async def mark_read(
+        self,
+        notification_id: UUID,
+    ) -> Notification:
+        """Пометить своё уведомление прочитанным."""
+
+        notification = await self.get_or_404(
+            notification_id,
+        )
+        notification.is_read = True
+        await self._session.flush()
+
+        return notification

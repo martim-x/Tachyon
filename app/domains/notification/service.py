@@ -2,6 +2,7 @@
 
 import logging
 from typing import Protocol
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +55,23 @@ class NotificationService:
             session,
         )
         self._notifier = notifier or NullNotifier()
+
+    async def list_unread(
+        self,
+    ) -> list[Notification]:
+        """Получить непрочитанные уведомления текущего пользователя."""
+
+        return await self._repository.list_unread()
+
+    async def mark_read(
+        self,
+        notification_id: UUID,
+    ) -> Notification:
+        """Пометить своё уведомление прочитанным."""
+
+        return await self._repository.mark_read(
+            notification_id,
+        )
 
     async def handle_budget_threshold(
         self,
