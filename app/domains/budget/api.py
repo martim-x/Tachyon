@@ -221,7 +221,7 @@ async def get_statuses(
     current_user: CurrentUser,
     session: SessionDep,
     clock: ClockDep,
-):
+) -> list[LimitStatusDTO]:
     statement = select(BudgetLimit).where(
         BudgetLimit.user_id == current_user.id,
     )
@@ -229,7 +229,7 @@ async def get_statuses(
     limits = result.scalars().all()
 
     today = clock.today()
-    result_data: list[dict[str, object]] = []
+    result_data: list[LimitStatusDTO] = []
 
     for limit_obj in limits:
         month_start = normalize_month(limit_obj.month)
@@ -305,20 +305,23 @@ async def get_statuses(
             else Decimal("0.0000")
         )
 
+        # Процент хранится с точностью до четырёх знаков после запятой.
         result_data.append(
-            {
-                "category_id": limit_obj.category_id,
-                "month": month_start,
-                "limit_amount_cents": (limit_obj.limit_amount_cents),
-                "spent_amount_cents": spent_amount_cents,
-                "remaining_amount_cents": max(
-                    limit_obj.limit_amount_cents - spent_amount_cents,
-                    0,
-                ),
-                "projected_amount_cents": (projected_amount_cents),
-                "percent": percent,
-                "status": status_value.name,
-            }
+            LimitStatusDTO.model_validate(
+                {
+                    "category_id": limit_obj.category_id,
+                    "month": month_start,
+                    "limit_amount_cents": limit_obj.limit_amount_cents,
+                    "spent_amount_cents": spent_amount_cents,
+                    "remaining_amount_cents": max(
+                        limit_obj.limit_amount_cents - spent_amount_cents,
+                        0,
+                    ),
+                    "projected_amount_cents": projected_amount_cents,
+                    "percent": percent,
+                    "status": status_value.name,
+                }
+            )
         )
 
     return result_data

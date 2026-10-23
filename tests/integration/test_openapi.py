@@ -1,5 +1,7 @@
 """Контракт опубликованной OpenAPI-спецификации."""
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -58,6 +60,8 @@ EXPECTED_API_ROUTES = {
     ("GET", "/api/v1/forecast"),
 }
 
+OPENAPI_PATH = Path(__file__).resolve().parents[2] / "openapi.json"
+
 
 def openapi_schema() -> dict[str, Any]:
     """Сгенерировать спецификацию непосредственно из приложения."""
@@ -103,14 +107,14 @@ def api_operations(
                 )
 
 
-def test_openapi_document_is_generated() -> None:
-    schema = openapi_schema()
+def test_exported_openapi_matches_generated_schema() -> None:
+    exported_schema = json.loads(
+        OPENAPI_PATH.read_text(
+            encoding="utf-8",
+        )
+    )
 
-    assert schema["openapi"].startswith("3.")
-    assert schema["info"]["title"] == "Tachyon"
-    assert schema["info"]["description"]
-    assert schema["paths"]
-    assert schema["components"]["schemas"]
+    assert exported_schema == openapi_schema()
 
 
 def test_openapi_contains_all_required_routes() -> None:
@@ -285,12 +289,33 @@ def test_actual_422_matches_documented_error_envelope() -> None:
     )
 
 
+def schema_example(
+    component: dict[str, Any],
+    component_name: str,
+) -> dict[str, Any]:
+    example = component.get("example")
+    examples = component.get("examples")
+
+    assert example is not None or examples, f"{component_name}: отсутствуют example или examples"
+
+    if example is not None:
+        return example
+
+    return examples[0]
+
+
 def test_money_examples_are_strings() -> None:
     schema = openapi_schema()
     components = schema["components"]["schemas"]
 
-    report_example = components["ReportDTO"]["example"]
-    forecast_examples = components["ForecastDTO"]["examples"]
+    report_example = schema_example(
+        components["ReportDTO"],
+        "ReportDTO",
+    )
+    forecast_example = schema_example(
+        components["ForecastDTO"],
+        "ForecastDTO",
+    )
 
     assert isinstance(
         report_example["income"],
@@ -304,8 +329,6 @@ def test_money_examples_are_strings() -> None:
         report_example["balance"],
         str,
     )
-
-    forecast_example = forecast_examples[0]
     assert isinstance(
         forecast_example["spent_to_date"],
         str,

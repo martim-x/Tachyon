@@ -136,6 +136,7 @@ async def report_by_category(
 
 @router.get(
     "/monthly/export",
+    response_class=Response,
     summary="Выгрузить финансовый отчёт",
     description=(
         "Формирует Excel-файл за указанный период. "
@@ -155,15 +156,11 @@ async def export_monthly_report(
         ExportFormat,
         Query(
             alias="format",
-            description="Формат выгружаемого файла.",
+            description=("Формат Excel-файла. Значения excel и xlsx являются эквивалентными."),
             examples=["xlsx"],
         ),
     ] = "excel",
 ) -> Response:
-    # Параметр объявлен в контракте API. Сейчас оба допустимых
-    # значения используют один Excel-адаптер.
-    _ = export_format
-
     service = ReportingService(session)
     report = await service.export_payload(
         date_from=date_from,

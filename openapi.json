@@ -1260,6 +1260,16 @@
               }
             }
           },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Ошибка проверки входных данных",
             "content": {
@@ -1767,23 +1777,20 @@
                 "xlsx"
               ],
               "type": "string",
-              "description": "Формат выгружаемого файла.",
+              "description": "Формат Excel-файла. Значения excel и xlsx являются эквивалентными.",
               "examples": [
                 "xlsx"
               ],
               "default": "excel",
               "title": "Format"
             },
-            "description": "Формат выгружаемого файла."
+            "description": "Формат Excel-файла. Значения excel и xlsx являются эквивалентными."
           }
         ],
         "responses": {
           "200": {
             "description": "Отчёт успешно сформирован.",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "type": "string",

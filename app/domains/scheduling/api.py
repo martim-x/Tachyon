@@ -40,7 +40,7 @@ RuleId = Annotated[
         "Создаёт правило автоматического формирования расходных операций "
         "с ежедневной, еженедельной или ежемесячной периодичностью."
     ),
-    responses=error_responses(401, 422),
+    responses=error_responses(401, 404, 422),
 )
 async def create_rule(
     payload: RecurringRuleCreate,
@@ -82,13 +82,11 @@ async def create_rule(
     responses=error_responses(401),
 )
 async def list_rules(
-    current_user: CurrentUser,
+    _current_user: CurrentUser,
     session: SessionDep,
 ) -> list[RecurringRule]:
     service = RecurringService(session)
-    return await service.list_rules(
-        str(current_user.id),
-    )
+    return await service.list_rules()
 
 
 @router.get(
@@ -103,14 +101,11 @@ async def list_rules(
 )
 async def get_rule(
     rule_id: RuleId,
-    current_user: CurrentUser,
+    _current_user: CurrentUser,
     session: SessionDep,
 ) -> RecurringRule:
     service = RecurringService(session)
-    return await service.get_rule(
-        str(rule_id),
-        str(current_user.id),
-    )
+    return await service.get_rule(rule_id)
 
 
 @router.patch(
@@ -126,20 +121,17 @@ async def get_rule(
 async def update_rule(
     rule_id: RuleId,
     payload: RecurringRuleUpdate,
-    current_user: CurrentUser,
+    _current_user: CurrentUser,
     session: SessionDep,
 ) -> RecurringRule:
     service = RecurringService(session)
 
-    # Меняем только переданные поля. Значение null допустимо
-    # для note и end_date и обрабатывается сервисом.
     fields = payload.model_dump(
         exclude_unset=True,
     )
 
     return await service.update_rule(
-        str(rule_id),
-        str(current_user.id),
+        rule_id,
         **fields,
     )
 
@@ -156,14 +148,11 @@ async def update_rule(
 )
 async def delete_rule(
     rule_id: RuleId,
-    current_user: CurrentUser,
+    _current_user: CurrentUser,
     session: SessionDep,
 ) -> None:
     service = RecurringService(session)
-    await service.delete_rule(
-        str(rule_id),
-        str(current_user.id),
-    )
+    await service.delete_rule(rule_id)
 
 
 @router.post(

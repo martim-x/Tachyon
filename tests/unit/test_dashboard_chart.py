@@ -65,10 +65,7 @@ def test_build_chart_keeps_labels_amounts_and_share_order() -> None:
 
 def test_build_chart_folds_more_than_seven_categories_into_other() -> None:
     # 8 категорий по 12.50% дают ровно 100.00%: топ-7 плюс «Прочие» тоже 12.50%.
-    points = [
-        point(f"Категория {index}", f"10.{index:02d}", "12.50")
-        for index in range(1, 9)
-    ]
+    points = [point(f"Категория {index}", f"10.{index:02d}", "12.50") for index in range(1, 9)]
 
     chart = build_chart(points)
 
@@ -144,10 +141,7 @@ def test_build_chart_rejects_non_positive_top_n() -> None:
 def test_build_chart_rejects_top_n_beyond_color_palette() -> None:
     # Цвет обязан быть уникальным на столбец (легенда неоднозначна иначе),
     # поэтому top_n больше палитры отклоняется, повторение недопустимо.
-    points = [
-        point(f"Категория {index}", "10.00", "12.50")
-        for index in range(8)
-    ]
+    points = [point(f"Категория {index}", "10.00", "12.50") for index in range(8)]
 
     with pytest.raises(ValueError):
         build_chart(points, top_n=len(points))

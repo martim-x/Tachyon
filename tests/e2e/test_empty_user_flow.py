@@ -29,7 +29,7 @@ async def test_empty_user_full_flow_register_category_operation(
     reg_body = reg_response.json()
     assert "id" in reg_body
     assert reg_body["email"] == "newuser@test.io"
-    
+
     # Login to get access token
     login_response = await client.post(
         "/api/v1/auth/login",
@@ -101,9 +101,7 @@ async def test_empty_user_full_flow_register_category_operation(
     assert ops["items"][0]["amount"] == "150.75"
 
     # 9. Фильтр по категории
-    filtered = (
-        await authed.get("/api/v1/operations", params={"category_id": cat_id})
-    ).json()
+    filtered = (await authed.get("/api/v1/operations", params={"category_id": cat_id})).json()
     assert filtered["total"] == 1
     assert filtered["items"][0]["id"] == op_id
 
@@ -141,7 +139,7 @@ async def test_empty_user_two_users_isolated(
         },
     )
     assert reg1.status_code == 201
-    
+
     # Login to get token
     login1 = await client1.post(
         "/api/v1/auth/login",
@@ -151,9 +149,7 @@ async def test_empty_user_two_users_isolated(
     token1 = login1.json()["access_token"]
     c1 = api_client(token=token1)
 
-    cat1 = (
-        await c1.post("/api/v1/categories", json={"name": "Cat1", "kind": "expense"})
-    ).json()
+    cat1 = (await c1.post("/api/v1/categories", json={"name": "Cat1", "kind": "expense"})).json()
     op1 = (
         await c1.post(
             "/api/v1/operations",
@@ -172,7 +168,7 @@ async def test_empty_user_two_users_isolated(
         },
     )
     assert reg2.status_code == 201
-    
+
     # Login to get token
     login2 = await client2.post(
         "/api/v1/auth/login",
@@ -182,9 +178,7 @@ async def test_empty_user_two_users_isolated(
     token2 = login2.json()["access_token"]
     c2 = api_client(token=token2)
 
-    cat2 = (
-        await c2.post("/api/v1/categories", json={"name": "Cat2", "kind": "expense"})
-    ).json()
+    cat2 = (await c2.post("/api/v1/categories", json={"name": "Cat2", "kind": "expense"})).json()
     op2 = (
         await c2.post(
             "/api/v1/operations",
@@ -260,7 +254,7 @@ async def test_empty_user_pagination_and_sorting(
         },
     )
     assert reg.status_code == 201
-    
+
     # Login to get token
     login = await client.post(
         "/api/v1/auth/login",
@@ -270,9 +264,7 @@ async def test_empty_user_pagination_and_sorting(
     token = login.json()["access_token"]
     authed = api_client(token=token)
 
-    cat = (
-        await authed.post("/api/v1/categories", json={"name": "Test", "kind": "expense"})
-    ).json()
+    cat = (await authed.post("/api/v1/categories", json={"name": "Test", "kind": "expense"})).json()
 
     # Создаём 12 операций в разные даты
     for day in range(1, 13):
@@ -287,9 +279,7 @@ async def test_empty_user_pagination_and_sorting(
         )
 
     # Первая страница (limit=5)
-    page1 = (
-        await authed.get("/api/v1/operations", params={"page": 1, "limit": 5})
-    ).json()
+    page1 = (await authed.get("/api/v1/operations", params={"page": 1, "limit": 5})).json()
     assert page1["page"] == 1
     assert page1["limit"] == 5
     assert page1["total"] == 12
@@ -303,9 +293,7 @@ async def test_empty_user_pagination_and_sorting(
     ]
 
     # Вторая страница
-    page2 = (
-        await authed.get("/api/v1/operations", params={"page": 2, "limit": 5})
-    ).json()
+    page2 = (await authed.get("/api/v1/operations", params={"page": 2, "limit": 5})).json()
     assert page2["page"] == 2
     assert page2["total"] == 12
     assert [item["occurred_at"][:10] for item in page2["items"]] == [
@@ -317,9 +305,7 @@ async def test_empty_user_pagination_and_sorting(
     ]
 
     # Третья страница (хвост)
-    page3 = (
-        await authed.get("/api/v1/operations", params={"page": 3, "limit": 5})
-    ).json()
+    page3 = (await authed.get("/api/v1/operations", params={"page": 3, "limit": 5})).json()
     assert page3["page"] == 3
     assert [item["occurred_at"][:10] for item in page3["items"]] == [
         "2026-10-02",

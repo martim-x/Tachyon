@@ -8,6 +8,7 @@ from tests.conftest import ApiClientFactory, CategoryFactory, LoggedInClient, Op
 
 pytestmark = pytest.mark.integration
 
+
 async def test_validation_error_has_unified_contract(
     api_client_a: LoggedInClient,
     category_factory: CategoryFactory,
