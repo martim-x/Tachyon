@@ -135,7 +135,15 @@ def _category_option(category: Category) -> dict[str, str]:
             "description": "HTML-страница дашборда за текущий месяц.",
             "content": {"text/html": {"schema": {"type": "string"}}},
         },
-        **error_responses(401, 422),
+        **error_responses(
+            401,
+            422,
+            content={
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                }
+            },
+        ),
     },
 )
 async def dashboard_page(

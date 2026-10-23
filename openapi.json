@@ -2132,7 +2132,7 @@
           "401": {
             "description": "Требуется корректная авторизация",
             "content": {
-              "text/html": {
+              "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -2142,7 +2142,7 @@
           "422": {
             "description": "Ошибка проверки входных данных",
             "content": {
-              "text/html": {
+              "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }

@@ -96,6 +96,9 @@
   application/json), шрифты перенесены в пакет app/assets/fonts + package-data (проверено сборкой
   wheel), тихий Helvetica-fallback заменён на RuntimeError + тест; гейт 7/7 (280 passed)
 - 2026-10-23 18:38 — смержено (тимлид, MR !30)
+- 2026-10-23 21:15 — замечания Duo по !34 закрыты: 401/422 с явным content application/json
+  (единой ErrorResponse), text/html фантом убран (error_responses + параметр content);
+  openapi.json пересобран, гейт 7/7 (286 passed)
 
 #### TT-33
 
