@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Уведомления</title>
+
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+
+    .dashboard {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .dashboard__title {
+      margin: 0 0 20px;
+    }
+
+    .notification-feed {
+      display: grid;
+      gap: 12px;
+    }
+
+    .notification {
+      padding: 16px;
+      border: 1px solid #cbd5e1;
+      border-left-width: 5px;
+      border-radius: 10px;
+      background: #ffffff;
+    }
+
+    .notification--warning {
+      border-left-color: #f59e0b;
+    }
+
+    .notification--exceeded {
+      border-left-color: #dc2626;
+    }
+
+    .notification__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .notification__title {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .notification__month {
+      color: #64748b;
+    }
+
+    .notification__categories {
+      margin: 12px 0;
+      padding-left: 20px;
+    }
+
+    .notification__category span {
+      display: block;
+      color: #475569;
+    }
+
+    .notification__close {
+      padding: 8px 18px;
+      border: 0;
+      border-radius: 8px;
+      color: #ffffff;
+      background: #2563eb;
+      cursor: pointer;
+    }
+
+    .notification-feed__empty {
+      padding: 16px;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <main class="dashboard">
+    <h1 class="dashboard__title">Уведомления</h1>
+
+    {% include "notifications/feed.html" %}
+  </main>
+</body>
+</html>
