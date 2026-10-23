@@ -15,6 +15,7 @@ from app.core.logging import configure_logging
 from app.core.persistence.session import session_scope
 from app.domains.scheduling.service import RecurringService
 from app.infrastructure.scheduler import OperationScheduler
+from app.interface.api.dashboard import router as dashboard_router
 from app.interface.api.exception_handlers import (
     error_body,
     register_exception_handlers,
@@ -56,6 +57,10 @@ OPENAPI_TAGS: list[dict[str, Any]] = [
     {
         "name": "Система",
         "description": ("Служебные маршруты состояния приложения."),
+    },
+    {
+        "name": "Уведомления",
+        "description": ("Уведомления о достижении порогов бюджетных лимитов."),
     },
 ]
 
@@ -143,6 +148,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(application)
     application.include_router(api_router)
+    application.include_router(dashboard_router)
 
     @application.get(
         "/health",

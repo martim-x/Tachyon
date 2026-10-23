@@ -79,12 +79,20 @@ async def create_recurring_execution(session: AsyncSession, user_id: UUID) -> Re
     return recurring_execution
 
 
-async def create_notification(session: AsyncSession, user_id: UUID) -> Notification:
+async def create_notification(
+    session: AsyncSession,
+    user_id: UUID,
+) -> Notification:
     notification = Notification(
         user_id=user_id,
-        type="limit_exceeded",
-        payload={"month": "2026-10"},
+        month=date(2026, 10, 1),
+        type="EXCEEDED",
+        payload={
+            "categories": [],
+        },
+        is_read=False,
     )
     session.add(notification)
     await session.flush()
+
     return notification

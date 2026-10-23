@@ -1985,6 +1985,111 @@
         }
       }
     },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "Уведомления"
+        ],
+        "summary": "Получить уведомления",
+        "description": "Возвращает непрочитанные уведомления текущего пользователя. Чужие и уже прочитанные уведомления в список не попадают.",
+        "operationId": "list_notifications_api_v1_notifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDTO"
+                  },
+                  "type": "array",
+                  "title": "Response List Notifications Api V1 Notifications Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/{notification_id}/read": {
+      "patch": {
+        "tags": [
+          "Уведомления"
+        ],
+        "summary": "Пометить уведомление прочитанным",
+        "description": "Помечает уведомление текущего пользователя прочитанным. Чужой или несуществующий UUID возвращает 404.",
+        "operationId": "mark_notification_read_api_v1_notifications__notification_id__read_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Идентификатор уведомления.",
+              "title": "Notification Id"
+            },
+            "description": "Идентификатор уведомления."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Требуется корректная авторизация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка проверки входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/dashboard": {
       "get": {
         "tags": [
@@ -2674,6 +2779,122 @@
           "email": "user@example.com",
           "password": "secure-password-123"
         }
+      },
+      "NotificationCategoryDTO": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id",
+            "description": "Идентификатор категории."
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name",
+            "description": "Название категории."
+          },
+          "spent_amount_cents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Spent Amount Cents",
+            "description": "Фактические расходы в целых копейках."
+          },
+          "limit_amount_cents": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit Amount Cents",
+            "description": "Размер лимита в целых копейках."
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "category_name",
+          "spent_amount_cents",
+          "limit_amount_cents"
+        ],
+        "title": "NotificationCategoryDTO",
+        "description": "Категория, достигшая порога лимита."
+      },
+      "NotificationDTO": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "title": "Month"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "WARNING",
+              "EXCEEDED"
+            ],
+            "title": "Type"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/NotificationPayloadDTO"
+          },
+          "is_read": {
+            "type": "boolean",
+            "title": "Is Read"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "month",
+          "type",
+          "payload",
+          "is_read",
+          "created_at"
+        ],
+        "title": "NotificationDTO",
+        "description": "Уведомление текущего пользователя.",
+        "example": {
+          "created_at": "2026-10-15T12:00:00Z",
+          "id": "21e714a4-1159-4b82-b32d-53a3549e263e",
+          "is_read": false,
+          "month": "2026-10-01",
+          "payload": {
+            "categories": [
+              {
+                "category_id": "38eb7fd2-e544-4520-8de1-266cc4050d85",
+                "category_name": "Продукты",
+                "limit_amount_cents": 100000,
+                "spent_amount_cents": 120000
+              }
+            ]
+          },
+          "type": "EXCEEDED"
+        }
+      },
+      "NotificationPayloadDTO": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationCategoryDTO"
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Категории, достигшие указанного порога."
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories"
+        ],
+        "title": "NotificationPayloadDTO",
+        "description": "Данные уведомления о бюджетном лимите."
       },
       "OperationCreate": {
         "properties": {
@@ -3713,6 +3934,10 @@
     {
       "name": "Система",
       "description": "Служебные маршруты состояния приложения."
+    },
+    {
+      "name": "Уведомления",
+      "description": "Уведомления о достижении порогов бюджетных лимитов."
     }
   ]
 }

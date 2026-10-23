@@ -22,7 +22,8 @@ from app.domains.ledger.service import (
     CategoryService,
     OperationService,
 )
-from app.interface.api.deps import CurrentUser, SessionDep
+from app.infrastructure.event_handlers import evaluate_budget_notifications
+from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
 from app.interface.api.schemas import error_responses
 
 router = APIRouter(
@@ -82,10 +83,18 @@ def _category_dto(
 )
 async def create_operation(
     payload: OperationCreate,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     session: SessionDep,
+    clock: ClockDep,
 ) -> OperationDTO:
     operation = await OperationService(session).create(payload)
+
+    await evaluate_budget_notifications(
+        session=session,
+        user_id=current_user.id,
+        month=operation.occurred_at.date(),
+        clock=clock,
+    )
 
     return _operation_dto(operation)
 
@@ -147,12 +156,20 @@ async def get_operation(
 async def patch_operation(
     operation_id: OperationId,
     payload: OperationUpdate,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     session: SessionDep,
+    clock: ClockDep,
 ) -> OperationDTO:
     operation = await OperationService(session).update(
         operation_id,
         payload,
+    )
+
+    await evaluate_budget_notifications(
+        session=session,
+        user_id=current_user.id,
+        month=operation.occurred_at.date(),
+        clock=clock,
     )
 
     return _operation_dto(operation)
