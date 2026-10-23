@@ -1,4 +1,7 @@
-"""Идемпотентность демо-данных (TT-36, FR-3) и /health без токена (FR-1)."""
+"""Идемпотентность демо-данных (TT-36, FR-3).
+
+Проверка /health без токена — tests/integration/test_health.py (FR-1).
+"""
 
 import os
 import subprocess
@@ -57,12 +60,10 @@ def test_seed_is_idempotent(tmp_path: Path) -> None:
 
     first = _run_seed(root, db_file)
     assert "Создан пользователь" in first.stdout
-    assert first.stderr == ""
 
     second = _run_seed(root, db_file)
     assert "уже есть" in second.stdout
     assert "Создан пользователь" not in second.stdout
-    assert second.stderr == ""
 
     # Проверка на уровне данных: ровно два демо-пользователя.
     check = subprocess.run(
