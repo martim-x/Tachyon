@@ -65,8 +65,14 @@ ERROR_DESCRIPTIONS = {
 
 def error_responses(
     *status_codes: int,
+    content: dict[str, Any] | None = None,
 ) -> dict[int | str, dict[str, Any]]:
-    """Сформировать OpenAPI responses с единой ErrorResponse."""
+    """Сформировать OpenAPI responses с единой ErrorResponse.
+
+    content - явные media-type'ы для кодов без модели-тела: без него
+    FastAPI подставляет media_type класса response_class роута
+    (Duo review !34: у HTML-страниц это text/html и для ошибок).
+    """
 
     responses: dict[
         int | str,
@@ -74,10 +80,18 @@ def error_responses(
     ] = {}
 
     for status_code in status_codes:
-        responses[status_code] = {
-            "model": ErrorResponse,
+        entry: dict[str, Any] = {
             "description": ERROR_DESCRIPTIONS[status_code],
         }
+
+        if content is not None:
+            # Явные media-type'ы полностью заменяют схему-модель: FastAPI
+            # иначе добавляет и модель, и default_media_type роута.
+            entry["content"] = content
+        else:
+            entry["model"] = ErrorResponse
+
+        responses[status_code] = entry
 
     return responses
 

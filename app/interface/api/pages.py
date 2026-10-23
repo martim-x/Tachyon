@@ -33,6 +33,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import model_validator as pydantic_model_validator
 from starlette.responses import Response
@@ -43,6 +44,7 @@ from app.domains.ledger.schemas import OperationListQuery
 from app.domains.ledger.service import CategoryService, OperationService
 from app.domains.reporting.service import ReportingService
 from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
+from app.interface.api.schemas import error_responses
 from app.interface.dashboard import render_category_chart
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -124,7 +126,26 @@ def _category_option(category: Category) -> dict[str, str]:
     return {"id": str(category.id), "name": category.name}
 
 
-@router.get("/dashboard", summary="Страница дашборда")
+@router.get(
+    "/dashboard",
+    response_class=HTMLResponse,
+    summary="Страница дашборда",
+    responses={
+        200: {
+            "description": "HTML-страница дашборда за текущий месяц.",
+            "content": {"text/html": {"schema": {"type": "string"}}},
+        },
+        **error_responses(
+            401,
+            422,
+            content={
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                }
+            },
+        ),
+    },
+)
 async def dashboard_page(
     query: Annotated[DashboardFilters, Query()],
     request: Request,
