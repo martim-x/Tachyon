@@ -5,9 +5,11 @@
 (NFR-3). Деньги рендерятся строками с двумя знаками: Decimal.quantize
 ("0.01"), без float в любом виде.
 
-Кириллица: шрифт DejaVu Sans встраивается в файл (assets/fonts),
-поэтому заголовки открываются без квадратов. Числа и суммы - base-14
-Helvetica (ASCII), сумма остаётся точным строковым значением из Decimal.
+Кириллица: шрифт DejaVu Sans встраивается в файл (app/assets/fonts
+пакируется в wheel), поэтому заголовки открываются без квадратов.
+Числа и суммы - base-14 Helvetica (ASCII), сумма остаётся точным
+строковым значением из Decimal. Шрифт обязателен: его отсутствие
+останавливает импорт (RuntimeError), а не рендерит нечитаемый файл.
 """
 
 import io
@@ -38,27 +40,9 @@ from app.domains.reporting.schemas import ReportDTO
 _FONT_NAME = "DejaVu"
 _FONT_NAME_BOLD = "DejaVu-Bold"
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-
-# Резервные системные пути, если assets/fonts не лежит рядом с кодом
-# (например, при установке пакета из wheel): первый найденный файл
-# регистрируется, иначе base-14 Helvetica - файл остаётся валидным PDF,
-# кириллица же в этом случае зависит от подстановки просмотрщика.
-_FONT_CANDIDATES = (
-    _REPO_ROOT / "assets" / "fonts" / "DejaVuSans.ttf",
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-    Path("/opt/local/share/fonts/dejavu/DejaVuSans.ttf"),
-    Path("/opt/homebrew/share/fonts/dejavu/DejaVuSans.ttf"),
-    Path("/Library/Fonts/Arial Unicode.ttf"),
-)
-
-_BOLD_FONT_CANDIDATES = (
-    _REPO_ROOT / "assets" / "fonts" / "DejaVuSans-Bold.ttf",
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-    Path("/opt/local/share/fonts/dejavu/DejaVuSans-Bold.ttf"),
-    Path("/opt/homebrew/share/fonts/dejavu/DejaVuSans-Bold.ttf"),
-    Path("/Library/Fonts/Arial Bold.ttf"),
-)
+# Шрифты живут внутри пакета (app/assets/fonts) и пакируются в wheel
+# через package-data: рендер не зависит от системных путей Linux/macOS.
+_FONT_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
 
 _MONEY_QUANTUM = Decimal("0.01")
 _PERCENT_QUANTUM = Decimal("0.01")
@@ -74,26 +58,32 @@ def _escape_markup(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _register_cyrillic_font(candidates: tuple[Path, ...], font_name: str) -> str:
+def _register_cyrillic_font(font_dir: Path, file_name: str, font_name: str) -> str:
     """Зарегистрировать кириллический шрифт один раз за процесс.
 
-    Возвращает имя зарегистрированного шрифта; если ни один файл не
-    найден, отдаёт base-14 Helvetica.
+    Шрифт обязателен: base-14 Helvetica не содержит кириллицы, а молча
+    рендерить нечитаемый отчёт с кодом 200 хуже, чем упасть на импорте
+    с явной причиной. Отсутствие файла - ошибка сборки/установки.
     """
 
     if font_name in pdfmetrics.getRegisteredFontNames():
         return font_name
 
-    for path in candidates:
-        if path.is_file():
-            pdfmetrics.registerFont(TTFont(font_name, str(path)))
-            return font_name
+    path = font_dir / file_name
 
-    return "Helvetica"
+    if not path.is_file():
+        raise RuntimeError(
+            f"Не найден кириллический шрифт {font_name} "
+            f"({path}): пакет app не содержит assets/fonts - "
+            "reinstall tachyon или восстановите файлы шрифтов"
+        )
+
+    pdfmetrics.registerFont(TTFont(font_name, str(path)))
+    return font_name
 
 
-_FONT = _register_cyrillic_font(_FONT_CANDIDATES, _FONT_NAME)
-_FONT_BOLD = _register_cyrillic_font(_BOLD_FONT_CANDIDATES, _FONT_NAME_BOLD)
+_FONT = _register_cyrillic_font(_FONT_DIR, "DejaVuSans.ttf", _FONT_NAME)
+_FONT_BOLD = _register_cyrillic_font(_FONT_DIR, "DejaVuSans-Bold.ttf", _FONT_NAME_BOLD)
 
 
 def format_money(amount: Decimal) -> str:

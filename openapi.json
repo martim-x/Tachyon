@@ -1871,9 +1871,6 @@
           "200": {
             "description": "Отчёт успешно сформирован.",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "application/pdf": {
                 "schema": {
                   "type": "string",

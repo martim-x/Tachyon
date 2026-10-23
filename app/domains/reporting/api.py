@@ -182,6 +182,7 @@ async def export_monthly_report(
 
 @router.get(
     "/monthly/export/pdf",
+    response_class=Response,
     summary="Экспорт отчёта в PDF",
     description=(
         "Возвращает тот же отчёт, что /monthly, файлом application/pdf "

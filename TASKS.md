@@ -90,6 +90,9 @@
 - 2026-10-23 18:22 — rebase на свежий main (в main смержился !32 openapi): конфликт api.py решён
   (оба роутера сохранены, PDF-роуту добавлен responses 200 application/pdf binary + 401/422),
   openapi.json пересобран под новый роут; гейт 7/7 (279 passed)
+- 2026-10-23 18:30 — замечания Duo по !30 закрыты: response_class=Response (openapi без фантомного
+  application/json), шрифты перенесены в пакет app/assets/fonts + package-data (проверено сборкой
+  wheel), тихий Helvetica-fallback заменён на RuntimeError + тест; гейт 7/7 (280 passed)
 
 #### TT-33
 

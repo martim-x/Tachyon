@@ -16,6 +16,19 @@ from app.interface.export.pdf import (
 pytestmark = pytest.mark.unit
 
 
+def test_missing_font_fails_loudly() -> None:
+    """Нет TTF - RuntimeError на регистрации, а не Helvetica-мусор (Duo,!30)."""
+
+    from pathlib import Path
+
+    from app.interface.export.pdf import _register_cyrillic_font
+
+    missing_dir = Path("/nonexistent/no/fonts")
+
+    with pytest.raises(RuntimeError, match="Не найден кириллический шрифт"):
+        _register_cyrillic_font(missing_dir, "DejaVuSans.ttf", "DejaVu-Loud-Fail")
+
+
 def _sample_report() -> ReportDTO:
     return ReportDTO(
         date_from=date(2026, 10, 1),
