@@ -1,0 +1,17 @@
+# Локальный запуск одной командой: docker compose up
+# Данные SQLite хранятся в volume ./data и переживают пересоздание контейнера.
+
+services:
+  app:
+    build: .
+    image: tachyon:latest
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # БД вне образа, в смонтированном каталоге (NFR-2).
+      DATABASE_URL: sqlite+aiosqlite:///./data/tachyon.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
