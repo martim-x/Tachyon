@@ -20,15 +20,11 @@
   </div>
 </section>
 
-{#
-  Зона задачи TT-29 (диаграмма расходов по категориям, TASKS.md).
-  Компонент рендерится из отдельного файла templates/dashboard/chart.html:
-  этот файл создаёт TT-29 своими коммитами и не трогает routers.py
-  (разграничение зон задаёт TASKS.md). Пока файла нет, include молчит
-  — страница отдаётся без диаграммы.
-  Данные для диаграммы: GET /api/v1/reports/by-category.
-#}
-{% include "dashboard/chart.html" ignore missing %}
+{# Диаграмма расходов по категориям: компонент задачи TT-29
+   (app/interface/dashboard, MR !31) на точках той же агрегации TT-26.
+   Фрагмент собран в pages.py функцией render_category_chart
+   (их окружение уже экранирует HTML; safe раскрывает готовую разметку). #}
+{{ chart_html | safe }}
 
 <section aria-label="Последние операции">
   <h2>Последние операции</h2>

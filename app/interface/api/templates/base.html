@@ -44,6 +44,19 @@
     .empty-state { border: 1px dashed var(--line); border-radius: .6rem;
       padding: 1rem; background: var(--surface); }
     code { background: var(--line); border-radius: .3rem; padding: 0 .3rem; }
+    .category-chart { margin: 1rem 0; }
+    .category-chart__empty { color: var(--muted); background: var(--surface);
+      border: 1px dashed var(--line); border-radius: .6rem; padding: 1rem; }
+    .category-chart__table { background: var(--surface); font-size: .85rem;
+      font-variant-numeric: tabular-nums; }
+    .category-chart__caption { font-weight: 600; padding: .5rem .6rem; }
+    .category-chart__cell, .category-chart__bar_cell { padding: .45rem .6rem; }
+    .category-chart__swatch { display: inline-block; width: .75rem; height: .75rem;
+      border-radius: .2rem; margin-right: .4rem; vertical-align: middle; }
+    .category-chart__bar { display: block; height: .6rem; border-radius: .25rem; }
+    .category-chart__bar_cell { padding-bottom: .8rem; }
+    .category-chart__row_other { color: var(--muted); }
+    .category-chart__total { font-weight: 600; border-top: 1px solid var(--line); }
     @media (max-width: 600px) {
       .cards { grid-template-columns: 1fr 1fr; }
       main { padding: .75rem; }

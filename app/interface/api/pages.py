@@ -8,17 +8,20 @@
   тот же код, что отдаёт /api/v1/reports/monthly;
 - список последних операций с фильтрами по дате, категории и типу -
   OperationService.list_page (ScopedRepository, user_id из UserContext);
-- выпадающий список категорий - CategoryService.list.
+- выпадающий список категорий - CategoryService.list;
+- диаграмма расходов - компонент TT-29 (app/interface/dashboard,
+  MR !31): render_category_chart получает точки той же агрегации
+  ReportingService.by_category за выбранный период; свой рендеринг
+  диаграммы здесь не дублируется.
 
 Деньги выводятся в шаблон только строками Decimal.quantize("0.01")
 ROUND_HALF_UP (docs/02 §«Правила денег»).
 
 Шаблоны страниц лежат в app/interface/api/templates/ (docs/02
-§«Структура папок», слой interface). Компонент диаграммы расходов - зона
-TT-29: его файл templates/dashboard/chart.html подключается через
-{% include ... ignore missing %}, пока файла нет, страница рендерится
-без диаграммы. Своего роутера дашбордовой диаграмме не нужно: данные
-доступны через /api/v1/reports/by-category.
+§«Структура папок», слой interface). Шаблон компонента диаграммы
+app/interface/templates/reporting/category_chart.html рендерится
+собственным окружением app/interface/dashboard/rendering.py и
+встраивается в страницу готовым фрагментом.
 """
 
 import calendar
@@ -40,6 +43,7 @@ from app.domains.ledger.schemas import OperationListQuery
 from app.domains.ledger.service import CategoryService, OperationService
 from app.domains.reporting.service import ReportingService
 from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
+from app.interface.dashboard import render_category_chart
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -134,8 +138,9 @@ async def dashboard_page(
     и прогноз на месяц, docs/03 §S8.1 T1): один вызов ReportingService.monthly
     по часам ClockDep. Фильтры последнего блока операций - поля
     DashboardFilters (наследует OperationListQuery, как у GET /api/v1/
-    operations). Анонимный запрос получает 401 от зависимости CurrentUser,
-    как у остального API.
+    operations); те же даты задают период диаграммы TT-29, поэтому при
+    смене периода компонент рендерится заново (docs/03 §S10.1). Анонимный
+    запрос получает 401 от зависимости CurrentUser, как у остального API.
     """
 
     today = clock.today()
@@ -155,6 +160,13 @@ async def dashboard_page(
     categories: Sequence[Category] = await CategoryService(session).list()
     names: dict[UUID, str] = {category.id: category.name for category in categories}
 
+    chart_from = query.date_from if query.date_from is not None else month_start
+    chart_to = query.date_to if query.date_to is not None else month_last
+    chart_points = await ReportingService(session).by_category(
+        date_from=chart_from,
+        date_to=chart_to,
+    )
+
     context = {
         "user_email": current_user.email,
         "report_month": report.forecast_month,
@@ -164,6 +176,11 @@ async def dashboard_page(
             "balance": report.balance,
             "forecast": report.forecast,
         },
+        "chart_html": render_category_chart(
+            chart_points,
+            date_from=chart_from,
+            date_to=chart_to,
+        ),
         "operations": [_operation_row(operation, names) for operation in operations],
         "total": total,
         "page": query.page,

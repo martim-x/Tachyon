@@ -63,6 +63,11 @@ async def test_dashboard_page_shows_month_summary_for_logged_user(
     assert "1850.00" in html
     assert "310.00" in html
 
+    # Компонент диаграммы TT-29 (MR !31) встроен в страницу: тот же период,
+    # что у сводки (docs/03 §S10.1); разметка компонента узнаваема.
+    assert "Диаграмма расходов по категориям" in html
+    assert "период 2026-10-01 — 2026-10-31" in html
+
 
 async def test_dashboard_page_empty_state_for_user_without_operations(
     api_client_a: LoggedInClient,
@@ -79,6 +84,8 @@ async def test_dashboard_page_empty_state_for_user_without_operations(
     assert "Дашборд" in html
     assert "Операций пока нет" in html
     assert "0.00" in html
+    # Пустое состояние диаграммы TT-29 тоже отображается (не 500, не тишь).
+    assert "Расходов за выбранный период нет" in html
 
 
 async def test_dashboard_page_isolation_hides_other_user_data(
@@ -198,7 +205,10 @@ async def test_dashboard_page_filters_operations_by_period_category_and_foreign_
     html_food = by_food.text
     assert "25.50" in html_food
     assert "31.50" in html_food
-    assert "90.00" not in html_food
+    # Диаграмма живёт по периоду, а не по категории (S10.1): «Транспорт 90.00»
+    # остаётся в её картинке месяца; фильтр категории действует на таблицу.
+    assert "Всего операций за выбранный период: 2" in html_food
+    assert "Всего операций за выбранный период: 3" not in html_food
 
     in_period = await client.get(
         "/dashboard",
@@ -208,7 +218,12 @@ async def test_dashboard_page_filters_operations_by_period_category_and_foreign_
     html_period = in_period.text
     assert "31.50" in html_period
     assert "25.50" not in html_period
+    # Сужение периода убирает 25.50 (2-е) и 90.00 (6-е) из таблицы И диаграммы.
     assert "90.00" not in html_period
+    assert "Всего операций за выбранный период: 1" in html_period
+    # docs/03 §S10.1: смена периода перестраивает диаграмму.
+    assert "период 2026-10-10 — 2026-10-15" in html_period
+    assert "период 2026-10-01 — 2026-10-31" not in html_period
 
     by_foreign = await client.get(
         "/dashboard",
