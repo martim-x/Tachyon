@@ -1,0 +1,50 @@
+{% if chart.is_empty %}
+<section class="category-chart" aria-label="Диаграмма расходов по категориям">
+  <p class="category-chart__empty" role="status">Расходов за выбранный период нет</p>
+</section>
+{% else %}
+<section class="category-chart" aria-label="Диаграмма расходов по категориям">
+  <table class="category-chart__table">
+    <caption class="category-chart__caption">
+      {% if chart.has_other %}Топ-{{ chart.top_n }} категорий и «Прочие»{% else %}Расходы по категориям{% endif %},
+      период {{ period_from }} — {{ period_to }}
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col" class="category-chart__cell category-chart__head_label">Категория</th>
+        <th scope="col" class="category-chart__cell category-chart__head_amount">Сумма</th>
+        <th scope="col" class="category-chart__cell category-chart__head_share">Доля</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bar in chart.bars %}
+      <tr class="category-chart__row{{ ' category-chart__row_other' if bar.is_other else '' }}">
+        <th scope="row" class="category-chart__cell category-chart__label">
+          <span aria-hidden="true" class="category-chart__swatch" style="background-color: {{ bar.color }};"></span>
+          <span class="category-chart__label_text">{{ bar.label }}</span>
+        </th>
+        <td class="category-chart__cell category-chart__amount">{{ bar.amount_display }}</td>
+        <td class="category-chart__cell category-chart__share">{{ bar.percent_display }}%</td>
+      </tr>
+      <tr class="category-chart__bar_row">
+        <td colspan="3" class="category-chart__bar_cell">
+          <span
+            aria-hidden="true"
+            class="category-chart__bar"
+            data-percent="{{ bar.percent }}"
+            style="width: {{ bar.percent }}%; background-color: {{ bar.color }};"
+          ></span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="category-chart__total">
+        <th scope="row" class="category-chart__cell">Итого</th>
+        <td class="category-chart__cell category-chart__amount">{{ chart.total_display }}</td>
+        <td class="category-chart__cell category-chart__share">{{ chart.percent_total_display }}%</td>
+      </tr>
+    </tfoot>
+  </table>
+</section>
+{% endif %}
