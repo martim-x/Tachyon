@@ -3,15 +3,19 @@ image: "python:3.12-slim"
 variables:
   # Тестовое значение только для CI; реальный ключ приходит из окружения деплоя.
   SECRET_KEY: "ci-test-secret-key-0123456789abcdef"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 stages:
   - lint-style
   - lint-types
   - lint-security
+  - boundaries
   - test-unit
   - test-integration
   - test-e2e
+  - coverage
   - db
+  - docker-build
 
 # ─── LINTERS (параллельно) ───
 lint-style:
@@ -43,6 +47,15 @@ lint-security:
     expire_in: 1 week
   allow_failure: false
 
+# ─── ГРАНИЦЫ ДОМЕНОВ ───
+boundaries:
+  stage: boundaries
+  before_script:
+    - python -m pip install -e ".[dev]"
+  script:
+    - bash scripts/check_boundaries.sh
+  allow_failure: false
+
 # ─── TESTS ───
 test-unit:
   stage: test-unit
@@ -71,6 +84,16 @@ test-e2e:
     - python -m pytest -q -m "e2e"
   allow_failure: false
 
+# ─── ПОКРЫТИЕ (весь набор, порог 70% по репозиторию) ───
+coverage:
+  stage: coverage
+  before_script:
+    - python -m pip install -e ".[dev]"
+    - cp .env.example .env
+  script:
+    - python -m pytest -q --cov=app --cov-fail-under=70
+  allow_failure: false
+
 # ─── DB ───
 db:
   stage: db
@@ -81,4 +104,19 @@ db:
     - alembic upgrade head
     - alembic downgrade base
     - alembic upgrade head
+  allow_failure: false
+
+# ─── СБОРКА ОБРАЗА ───
+docker-build:
+  stage: docker-build
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker info
+  script:
+    - docker build -t app:test .
   allow_failure: false
