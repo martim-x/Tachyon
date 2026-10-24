@@ -38,6 +38,7 @@ dev = [
     "pandas-stubs>=2.2,<3",
     "types-openpyxl>=3.1,<4",
     "types-reportlab>=4.4,<6",
+    "pytest-cov>=6,<7",
 ]
 
 [tool.setuptools.packages.find]

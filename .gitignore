@@ -32,3 +32,4 @@ bandit-report.json
 # Сборочные артефакты
 build/
 dist/
+.coverage
