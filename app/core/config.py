@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     scheduler_enabled: bool = False
     scheduler_interval_seconds: int = 60
+    cookie_secure: bool = False
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

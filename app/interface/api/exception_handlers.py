@@ -6,7 +6,7 @@
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.core.errors import (
     AuthenticationFailed,
@@ -38,9 +38,16 @@ async def permission_denied_handler(
 
 
 async def authentication_failed_handler(
-    _request: Request,
+    request: Request,
     _exc: AuthenticationFailed,
-) -> JSONResponse:
+) -> JSONResponse | RedirectResponse:
+    # HTML-страницы дашборда: браузерная сессия (cookie) -> редирект на /login
+    # с очисткой старой cookie. JSON API получает стандартный error envelope.
+    path = getattr(getattr(request, "url", None), "path", "") or ""
+    if path.startswith("/dashboard"):
+        response = RedirectResponse(url="/login", status_code=303)
+        response.delete_cookie(key="access_token", path="/")
+        return response
     return JSONResponse(
         error_body("UNAUTHORIZED", "Не удалось подтвердить учётные данные"),
         status_code=401,
