@@ -1,41 +1,47 @@
 # Tachyon — трекер доходов и расходов
 
-Многопользовательское приложение для учёта доходов и расходов: лимиты
-бюджета, повторяющиеся операции, прогноз трат. REST API на FastAPI,
-модульный монолит с вертикальными доменными срезами.
+Многопользовательское приложение для учёта личных доходов и расходов: категории
+и операции, лимиты бюджета с алертами, повторяющиеся операции, прогноз трат до
+конца месяца, отчёты с выгрузкой в Excel и PDF.
+
+Реализовано как REST API на FastAPI плюс браузерный дашборд. Архитектура —
+модульный монолит с вертикальными доменными срезами, 7 доменов.
 
 ![logo](assets/logo.png)
 
-## Дедлайны
-
-| Событие | Дата |
+| Параметр | Значение |
 |---|---|
-| Сдача кода, ссылка на репозиторий организатору | **22 октября** |
-| Защита проекта (телемост) | **24–25 октября** |
-
-Защита: 7 минут на демонстрацию, 2–3 минуты на вопросы. Выступает вся команда.
+| Live-стенд | <https://tachyon-demo.up.railway.app> |
+| Swagger | <https://tachyon-demo.up.railway.app/docs> |
+| API | 22 пути, 32 операции |
+| Тесты | 329 (все зелёные) |
+| Код приложения / тестов | 7 480 / 8 658 строк Python |
 
 ## Стек
 
 | Слой | Технологии |
 |---|---|
-| Язык | Python 3.11+ |
-| API | FastAPI, Pydantic v2 |
-| Данные | SQLAlchemy 2 (async), SQLite через aiosqlite, Alembic (миграции) |
+| Язык | Python 3.11+ (CI и Docker — 3.12) |
+| API | FastAPI, Pydantic v2, python-multipart (формы) |
+| Данные | SQLAlchemy 2 (async), SQLite через aiosqlite, Alembic |
 | Аутентификация | JWT (PyJWT), bcrypt |
-| Тесты и качество | pytest, pytest-asyncio, httpx, ruff |
+| Аналитика | pandas (агрегации), numpy |
+| Экспорт | openpyxl (Excel), reportlab (PDF, шрифт DejaVu для кириллицы) |
+| Веб-интерфейс | Jinja2, HTMX (страница уведомлений) |
+| Планировщик | APScheduler |
+| Тесты и качество | pytest, pytest-asyncio, pytest-cov, httpx, ruff, mypy, bandit |
 | Запуск | uvicorn |
 
-Зависимости и версии описаны в `pyproject.toml`; `requirements.txt` собран
-из него (`uv pip compile pyproject.toml --extra dev --universal`) и используется
-для ручной установки локально. CI ставит зависимости из `pyproject.toml`
-через `pip install -e ".[dev]"`, поэтому `requirements.txt` нужно
-пересобирать при изменении зависимостей — иначе сценарий «запуск с нуля»
-разойдётся с пайплайном.
+Зависимости и версии — в `pyproject.toml`. `requirements.txt` (с `--extra dev`) и
+`requirements.prod.txt` собраны из него командой
+`uv pip compile pyproject.toml --extra dev --universal`; Dockerfile ставит именно
+prod-файл. CI ставит зависимости из `pyproject.toml` через `pip install -e ".[dev]"`,
+поэтому оба pinned-файла нужно пересобирать при изменении зависимостей — иначе
+сценарий «запуск с нуля» и образ разойдутся с пайплайном.
 
 ## Запуск с нуля
 
-Требуется Python 3.11 или новее (`python3 --version`).
+Требуется Python 3.11 или новее.
 
 ```bash
 python3 -m venv .venv
@@ -48,102 +54,267 @@ uvicorn app.main:app --reload
 
 После запуска доступны:
 
+- дашборд: <http://127.0.0.1:8000/login> → после входа `/dashboard`;
 - health-check: <http://127.0.0.1:8000/health>;
 - Swagger: <http://127.0.0.1:8000/docs>;
 - ReDoc: <http://127.0.0.1:8000/redoc>.
 
-Файл `.env` содержит локальные настройки и секреты, поэтому не добавляется
-в Git; шаблон допустимых переменных — `.env.example` (в примере — заглушки).
+Без применённых миграций `POST /api/v1/auth/register` отвечает
+`INTERNAL_ERROR` — сначала `alembic upgrade head`.
 
-## Тесты
+Файл `.env` содержит локальные настройки и секреты, поэтому не добавляется в Git;
+шаблон допустимых переменных — `.env.example`.
+
+## Переменные окружения
+
+| Переменная | Обязательна | По умолчанию | Назначение |
+|---|---|---|---|
+| `DATABASE_URL` | да | — | строка подключения, например `sqlite+aiosqlite:///./tachyon.db` |
+| `SECRET_KEY` | да | — | подпись JWT, не короче 32 символов |
+| `TOKEN_TTL` | нет | `60` | время жизни access-токена, минуты |
+| `APP_NAME` | нет | `Tachyon` | заголовок приложения |
+| `LOG_LEVEL` | нет | `INFO` | уровень логирования |
+| `SCHEDULER_ENABLED` | нет | `false` | включает APScheduler |
+| `SCHEDULER_INTERVAL_SECONDS` | нет | `60` | период опроса правил |
+| `COOKIE_SECURE` | нет | `false` | флаг `Secure` у cookie входа; на HTTPS включать |
+
+Переменные окружения имеют приоритет над `.env` (pydantic-settings).
+
+## Демо-данные
 
 ```bash
-pytest                                           # весь набор: 137 passed
-pytest tests/unit                                # бизнес-логика без БД: 62 passed
-pytest -k isolation                              # изоляция данных: 25 passed
-pytest -k forecast                               # прогноз и краевые случаи: 32 passed
-pytest -k empty                                  # пустые данные не падают: 1 passed
-ruff check .                                     # All checks passed!
-alembic upgrade head && alembic downgrade base && alembic upgrade head   # обратимость миграций (пересоздаёт схему, данные локальной БД теряются)
+APP_ENV=dev python -m scripts.seed     # или: python -m scripts.seed --force
 ```
 
-`pytest` печатает точное число последней строкой. Тесты выполняются на
-временной SQLite: каждый тест получает копию БД-шаблона с накатанными
-миграциями и не трогает рабочую базу (`tests/conftest.py`).
+Скрипт создаёт двух пользователей (`demo1@tachyon.local`, `demo2@tachyon.local`),
+категории доходов и расходов, операции за два месяца, лимит бюджета и
+повторяющееся правило. Запуск идемпотентен: если демо-пользователи уже есть,
+скрипт ничего не меняет. Пароль демо-пользователей задан в `scripts/seed.py`.
+
+Защита от прода: без `APP_ENV=dev|test|local`, `SEED_DEMO=1` или флага `--force`
+скрипт отказывается работать, потому что содержит публичный демо-пароль.
+
+## Веб-интерфейс
+
+| Страница | Что делает |
+|---|---|
+| `GET/POST /login` | форма входа, при успехе ставит HttpOnly-cookie `access_token` |
+| `GET /logout` | очищает cookie |
+| `GET /dashboard` | сводка за период, фильтры, таблица операций, PDF-выгрузка |
+| `GET /dashboard/notifications` | лента алертов по лимитам, отметка «прочитано» через HTMX |
+
+Разделение аутентификации сознательное: **API принимает только Bearer-токен**,
+cookie работает исключительно на HTML-страницах. Это закрывает CSRF для API:
+браузер не приложит токен к запросу автоматически. Неавторизованный браузер
+получает `303` на `/login`, неавторизованный API-клиент — `401` с конвертом
+ошибки.
+
+Создание и редактирование операций, категорий, лимитов и правил — через API и
+Swagger; дашборд работает в режиме чтения.
+
+## API
+
+Полная схема — `openapi.json` (регенерируется из кода и сверяется тестом).
+
+| Домен | Методы и пути |
+|---|---|
+| identity | `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` |
+| ledger | `GET/POST /api/v1/operations`, `GET/PATCH/DELETE /api/v1/operations/{operation_id}`, `GET/POST /api/v1/categories`, `GET/PATCH/DELETE /api/v1/categories/{category_id}` |
+| budget | `GET/POST /api/v1/budget-limits`, `PUT /api/v1/budget-limits/{category_id}`, `GET /api/v1/budget-limits/status` |
+| forecasting | `GET /api/v1/forecast` |
+| reporting | `GET /api/v1/reports/monthly`, `GET /api/v1/reports/by-category`, `GET /api/v1/reports/monthly/export` (Excel), `GET /api/v1/reports/monthly/export/pdf` |
+| scheduling | `GET/POST /api/v1/recurring/rules`, `GET/PATCH/DELETE /api/v1/recurring/rules/{rule_id}`, `POST /api/v1/recurring/rules/run` |
+| notification | `GET /api/v1/notifications`, `PATCH /api/v1/notifications/{notification_id}/read` |
+| служебное | `GET /health` |
+
+### Экспорт отчётов
+
+- `GET /api/v1/reports/monthly/export?format=xlsx` — Excel, три листа: «Операции», «По категориям», «Сводка».
+- `GET /api/v1/reports/monthly/export/pdf?from=YYYY-MM-DD&to=YYYY-MM-DD` — PDF, один файл, кириллица через встроенный DejaVu. Параметра `format` у PDF-ветки нет; без дат или при `from > to` — `422`.
+
+### Ошибки
+
+Единый конверт `{"error": {"code": "...", "message": "...", "detail": [...]}}`.
+Коды машиночитаемые и в верхнем регистре (`NOT_FOUND`, `VALIDATION_ERROR`,
+`AUTHENTICATION_FAILED`). Чужой объект отдаёт `404`, а не `403` — существование
+чужих записей не подтверждается.
 
 ## Архитектура
 
 ```
 app/
-├── core/            # ядро: конфиг, ошибки, логирование, Money, Clock, UserContext, доступ к данным
-├── domains/         # вертикальные срезы: identity, ledger, budget, scheduling, forecasting, reporting, notification
+├── core/            # конфиг, ошибки, логирование, Money, Clock, UserContext, события, доступ к данным
+├── domains/         # вертикальные срезы: identity, ledger, budget, scheduling,
+│                    # forecasting, reporting, notification
 │   └── <домен>/     # слои: models.py -> repository.py -> service.py -> api.py
-├── interface/api/   # сборка FastAPI-приложения
-├── infrastructure/  # планировщик и внешние адаптеры
+├── interface/       # сборка FastAPI-приложения, страницы, шаблоны
+├── infrastructure/  # планировщик, обработчики событий, внешние адаптеры
 └── main.py
 tests/
-├── unit/            # бизнес-логика без базы данных
-└── integration/     # сквозные сценарии на временной SQLite
+├── unit/            # бизнес-логика без БД
+├── integration/     # сценарии на временной SQLite
+└── e2e/             # сквозные пользовательские сценарии
 ```
 
-Приложение построено как **модульный монолит с вертикальными доменными срезами**. Внутри каждого домена выдержаны три слоя из требования ТЗ: данные (`models.py`, `repository.py`), бизнес-логика (`service.py`) и интерфейс (`api.py`). Домены владеют собственными таблицами и зависят друг от друга строго снизу вверх:
+Приложение построено как **модульный монолит с вертикальными доменными срезами**.
+Внутри каждого домена выдержаны слои: данные (`models.py`, `repository.py`),
+бизнес-логика (`service.py`), интерфейс (`api.py`). Домены владеют собственными
+таблицами и зависят друг от друга строго снизу вверх:
 
 ```
 identity -> ledger -> {budget, scheduling} -> forecasting -> reporting -> export
 ```
 
-`notification` подписан на доменные события (например, `LimitExceeded`) и не знает, из какого домена они пришли. Ядро (`app/core`: конфиг, логирование, ошибки, `Money`, `Clock`, `UserContext`, события, доступ к данным) не зависит ни от одного домена.
+`notification` подписан на доменные события и не знает, из какого домена они
+пришли. Ядро (`app/core`) не зависит ни от одного домена.
 
-Домены: `identity` (пользователи, JWT), `ledger` (операции, категории, баланс), `budget` (лимиты, процент, остаток, событие превышения), `scheduling` (повторяющиеся правила, clamp дат, catch-up), `forecasting` (стратегии темпа трат), `reporting` (агрегации и DTO, только чтение), `notification` (уведомления с дедупликацией).
+| Домен | Ответственность |
+|---|---|
+| `identity` | пользователи, регистрация, вход, JWT |
+| `ledger` | операции, категории, фильтры и пагинация |
+| `budget` | лимиты на категорию и месяц, пороги 80 % / 100 %, статус |
+| `scheduling` | повторяющиеся правила, clamp дат, catch-up, идемпотентность |
+| `forecasting` | стратегии темпа трат, прогноз до конца месяца |
+| `reporting` | агрегации, DTO, диаграмма, Excel и PDF |
+| `notification` | алерты о порогах с дедупликацией |
 
-Расчёты прогноза вынесены в **чистое вычислительное ядро** `app/domains/forecasting/`: модуль не импортирует SQLAlchemy и FastAPI, поэтому тестируется без базы данных. Календарная математика берёт длину месяца из `calendar.monthrange`, а не из `timedelta(days=30)`, поэтому февраль високосного года считается как 29 дней. Деньги хранятся целыми копейками, расчёты идут в `Decimal` с округлением `ROUND_HALF_UP`.
+Расчёты прогноза вынесены в **чистое вычислительное ядро**
+`app/domains/forecasting/`: модуль не импортирует SQLAlchemy и FastAPI, поэтому
+тестируется без базы данных. Календарная математика берёт длину месяца из
+`calendar.monthrange`, а не из `timedelta(days=30)`, поэтому февраль високосного
+года считается как 29 дней.
 
-**Изоляция данных** обеспечивается механизмом, а не дисциплиной: у каждой таблицы есть `user_id` c индексом, `UserContext` (contextvar) это единственный источник текущего пользователя, а все репозитории наследуют `ScopedRepository`, который берёт `user_id` из контекста и не принимает его снаружи. Забыть фильтр трудно: query-builder наружу не выдаётся, а пустой контекст приводит к исключению, а не к пустой выдаче. Обращение к чужому объекту по id возвращает **404, а не 403**, чтобы не подтверждать существование чужих записей.
+Деньги хранятся целыми копейками (`amount_cents`), расчёты идут в `Decimal` с
+округлением `ROUND_HALF_UP`; float в денежных путях не используется. Валюта одна
+(рубли) — мультивалютность не поддерживается.
 
-Границы доменов проверяются автоматически: `import-linter` в CI запрещает междоменные импорты моделей и зависимости доменов от интерфейса, а `scripts/check_boundaries.sh` проверяет, что в `forecasting` нет строки `sqlalchemy`, в `reporting` нет `session.commit`, а APScheduler упоминается только в `app/infrastructure/scheduler.py`.
+### Изоляция данных
 
-Микросервисы сознательно не выбраны: ТЗ требует SQLite, Railway привязывает volume к одному сервису, проверка лимита и запись операции должны быть одной транзакцией, а четыре сервиса по 512 MB дают $20 в месяц только за память при круглосуточной работе. Гексагональная архитектура не применяется целиком, потому что в ТЗ требуются слои дословно, а внешних интеграций у проекта две; её механизмы (порты, внедряемые часы, базовый репозиторий) взяты выборочно там, где они дают пользу.
+Изоляция обеспечена механизмом, а не дисциплиной:
 
-Часть механизмов из формулировки выше — целевое состояние `docs/02`/`docs/03`: проверки границ (`import-linter`, `scripts/check_boundaries.sh`) и планировщик на APScheduler приходят со своими задачами бэклога — в текущих зависимостях (`pyproject.toml`) и CI их ещё нет. Таблица «Стек» выше описывает установленное сейчас; формулировка вставлена из `docs/02` без изменений.
+- у каждой пользовательской таблицы есть `user_id` с индексом;
+- `UserContext` (contextvar) — единственный источник текущего пользователя;
+- все репозитории наследуют `ScopedRepository`, который берёт `user_id` из
+  контекста и не принимает его снаружи;
+- query-builder наружу не выдаётся, а пустой контекст приводит к исключению, а
+  не к пустой выдаче;
+- владение внешними ключами проверяется в репозитории (`_assert_fk_ownership`),
+  поэтому чужую категорию нельзя подставить в свою операцию;
+- обращение к чужому объекту по id возвращает `404`, а не `403`.
+
+### Границы доменов
+
+Проверяются автоматически в CI (`scripts/check_boundaries.sh`): в `forecasting`
+запрещены импорты ORM и HTTP-фреймворка, в `reporting` — `session.commit`,
+APScheduler упоминается только в `app/infrastructure/scheduler.py`.
 
 ### Схема БД
 
-| Таблица | Что хранит | Ключевые поля |
+| Таблица | Что хранит | Колонки |
 |---|---|---|
 | `users` | пользователи | `id`, `email`, `password_hash`, `token_version`, `created_at` |
 | `categories` | категории доходов и расходов | `id`, `user_id`, `name`, `kind`, `color`, `is_default` |
-| `operations` | операции | `id`, `user_id`, `category_id`, `amount_cents`, `kind`, `occurred_at`, `note`, `source` |
+| `operations` | операции | `id`, `user_id`, `category_id`, `amount_cents`, `kind`, `occurred_at`, `note`, `source`, `recurring_execution_id` |
 | `budget_limits` | лимит на категорию и месяц | `id`, `user_id`, `category_id`, `month`, `limit_amount_cents` |
-| `recurring_rules` | правила повторяющихся операций | `id`, `user_id`, `category_id`, `kind`, `interval`, `amount_cents`, `start_date`, `next_run_at`, `is_active` |
+| `recurring_rules` | правила повторяющихся операций | `id`, `user_id`, `category_id`, `kind`, `interval`, `amount_cents`, `note`, `start_date`, `end_date`, `next_run_at`, `last_run_at`, `is_active` |
 | `recurring_executions` | факты генерации (идемпотентность) | `id`, `user_id`, `rule_id`, `period_date`, `operation_id` |
-| `notifications` | уведомления | `id`, `user_id`, `type`, `payload`, `is_read`, `created_at` |
+| `notifications` | уведомления о порогах | `id`, `user_id`, `month`, `type`, `payload`, `is_read`, `created_at` |
 
-Деньги хранятся целыми копейками (`amount_cents`), суммы в API — `Decimal`
-с двумя знаками. Схема накатывается миграциями Alembic
-(`migrations/versions/`), а не `create_all`.
+Схема накатывается миграциями Alembic (`migrations/versions/`), а не
+`create_all`; обратимость (`up → down → up`) проверяется в CI.
+`notifications` имеет уникальный индекс по (`user_id`, `month`, `type`) — один
+алерт на пользователя, месяц и порог.
 
-## Что осознанно не сделано
+## Тесты
 
-Обязательный объём зафиксирован в `docs/03` (лестница сокращений). За его
-пределами сознательно оставлены:
+```bash
+pytest                                                                    # 329 тестов
+pytest -m unit                                                            # 97
+pytest -m integration                                                     # 196
+pytest -m e2e                                                             # 4
+pytest -k isolation                                                       # 30
+pytest -k forecast                                                        # 43
+pytest -k empty                                                           # 27
+pytest --cov=app --cov-fail-under=70                                      # покрытие
+alembic upgrade head && alembic downgrade base && alembic upgrade head    # обратимость миграций
+```
 
-| История | Почему не делаем |
+Остальные 32 теста (лимиты и доменные события) идут без маркера и попадают в
+полный прогон. Тесты выполняются на временной SQLite: каждый тест получает копию
+БД-шаблона с накатанными миграциями и не трогает рабочую базу
+(`tests/conftest.py`).
+
+## Линтеры и типы
+
+```bash
+ruff check .                                            # стиль и импорты
+mypy app                                                # статические типы
+bandit -r app -c pyproject.toml -ll -iii                # безопасность
+bash scripts/check_boundaries.sh                        # границы доменов
+```
+
+`ruff`, `mypy` и `bandit` настроены в `pyproject.toml`; bandit блокирует находки
+HIGH/MEDIUM с высокой уверенностью (без `|| true`).
+
+## CI
+
+`.gitlab-ci.yml`, 10 стадий; падение любой из них блокирует merge.
+
+| Стадия | Что проверяет |
 |---|---|
-| S7.2 PDF-экспорт | в ТЗ «Excel **или** PDF» — требование закрывает Excel |
-| S8.2 Страницы лимитов и подписок | операции и лимиты создаются через Swagger |
-| S8.1 Дашборд целиком | Swagger и ReDoc генерируются из кода и стоят 0 SP |
-| S9.5 Демо-данные | возвращаются последними перед защитой, только если данных нет |
-| S4.5 Ручной прогон генерации | джоб планировщика и так создаёт операции |
-| S6.3 Прогноз с повторами | базовый прогноз по факту остаётся, без плановых будущих сумм |
-| S6.4 Отчёт по категориям на pandas | диаграмма строится на SQL-группировке |
+| `lint-style` | `ruff check .` |
+| `lint-types` | `mypy app` |
+| `lint-security` | `bandit -ll -iii` |
+| `boundaries` | `scripts/check_boundaries.sh` |
+| `test-unit` | `pytest -m unit` |
+| `test-integration` | `pytest -m integration` |
+| `test-e2e` | `pytest -m e2e` |
+| `coverage` | `pytest --cov=app --cov-fail-under=70` |
+| `db` | `alembic upgrade → downgrade → upgrade` |
+| `docker-build` | `docker build -t app:test .` |
 
-Веб-интерфейс (E8) целиком уведён в Should: для демонстрации API хватает
-Swagger и ReDoc. Тесты защитного контура — изоляция данных (S9.2) и
-идемпотентность планировщика (S9.3) — не снимаются ни при каком сценарии.
+## Docker
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Стеклок: `python:3.12-slim`, зависимости из `requirements.prod.txt`, миграции
+накатываются в `CMD` перед стартом uvicorn. Порт контейнера 8000, наружу
+пробрасывается `${APP_PORT:-8000}`. База лежит в `./data` (volume), поэтому
+переживает пересоздание контейнера. Секреты в образ не вшиваются — читаются из
+`.env` через pydantic-settings.
+
+## Деплой на Railway
+
+Схема: работа и MR — в GitLab, Railway собирает образ из зеркала на GitHub
+(`main`). После пуша в GitLab нужен `git push github main`, иначе прод останется
+на старом коммите.
+
+Сервис: проект `tachyon-demo`, домен `https://tachyon-demo.up.railway.app`,
+приложение слушает порт из `PORT` (Railway задаёт `8080`).
+
+Обязательные переменные: `DATABASE_URL`, `SECRET_KEY` (≥ 32 символов). Для HTTPS
+также `COOKIE_SECURE=true`. `.env` на прод не едет — только переменные окружения.
+
+**Volume не подключён:** база живёт в файловой системе контейнера, поэтому каждый
+деплой создаёт её заново (Alembic накатывает все миграции с нуля) и демо-данные
+нужно заливать повторно через `scripts/seed.py`.
+
+## Что осталось за рамками
+
+| Чего нет | Комментарий |
+|---|---|
+| Внешняя доставка уведомлений | порт `Notifier` объявлен, реализация — `NullNotifier`: алерты видны только в API и дашборде, email/Telegram/push не отправляются |
+| Импорт банковских выписок | операции вводятся через API или Swagger |
+| Общие аккаунты (семья, команда) | изоляция строгая: один пользователь — один кошелёк |
+| Смена и сброс пароля | есть только регистрация и вход |
+| Выход со всех устройств | поле `token_version` заведено, но эндпоинта нет |
+| Редактирование данных в браузере | дашборд только читает, запись через API |
+| Мультивалютность | одна валюта, суммы без кода валюты |
 
 ## Что здесь лежит
-
-Репозиторий содержит рабочую документацию и приложение FastAPI.
 
 | Файл | О чём |
 |---|---|
@@ -156,84 +327,22 @@ Swagger и ReDoc. Тесты защитного контура — изоляц�
 | `docs/06_тестирование.md` | Что тестировать и почему именно это оценивают |
 | `docs/07_защита_проекта.md` | Чек-лист демо, вероятные вопросы комиссии |
 | `docs/08_перечень_задач.md` | Недельный чек-лист и критический путь |
-| `assets/logo.png` | Логотип проекта |
+| `scripts/seed.py` | идемпотентные демо-данные |
+| `scripts/check_boundaries.sh` | проверка границ доменов для CI |
+| `openapi.json` | экспортированная схема API, сверяется тестом |
+| `assets/logo.png` | логотип проекта |
 
-## Команда
+Сроки проекта: сдача кода — 22 октября, защита — 24–25 октября.
 
-5 человек, распределение ролей и зон ответственности — в
-`docs/04_команда_и_роли.md`.
+## Разработка
 
-## Связь
-
-Домены внутри каталога `docs/` описывают один и тот же проект. Если меняется
-бэклог — поправь оценки в `03`, приоритеты в `04`, критерии приёмки в `06`.
-
-## 🛠 Разработка
-
-### Pre-commit хуки
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-### Линтеры (в CI — отдельными стадиями)
-```bash
-# Стиль и импорты
-ruff check .
+Команда: 5 человек, распределение ролей и зон ответственности — в
+`docs/04_команда_и_роли.md`.
 
-# Типы
-mypy app
-
-# Безопасность
-bandit -r app -c pyproject.toml -ll -iii
-```
-
-### Тесты
-```bash
-# Unit (быстро, без БД)
-pytest -q -m unit
-
-# Integration (с БД, миграциями)
-pytest -q -m integration
-
-# E2E (сквозные)
-pytest -q -m e2e
-
-# Все
-pytest -q
-```
-
-### CI Pipeline
-| Stage | Job | Назначение |
-|-------|-----|------------|
-| lint-style | ruff | Стиль, импорты, ошибки |
-| lint-types | mypy | Статические типы |
-| lint-security | bandit | Security audit |
-| test-unit | pytest -m unit | Быстрые тесты |
-| test-integration | pytest -m integration | Интеграционные тесты |
-| test-e2e | pytest -m e2e | Сквозные сценарии |
-| db | alembic | Миграции up/down/up |
-
-## Запуск в Docker
-
-Требуется установленный Docker (Docker Desktop или Engine + Compose v2).
-
-```bash
-cp .env.example .env          # при необходимости отредактируйте .env
-docker compose up --build      # сборка образа и запуск
-```
-
-После запуска доступны:
-- health-check: <http://127.0.0.1:8000/health>;
-- Swagger: <http://127.0.0.1:8000/docs>.
-
-Данные SQLite хранятся в каталоге `./data` (volume) и переживают
-перезапуск и пересоздание контейнера. Конфигурация подхватывается из
-`.env` при пересоздании контейнера (новые значения — `docker compose
-up --build` с обновлённым `.env`).
-
-Порт можно переопределить переменной `APP_PORT` в `.env` или окружении:
-`APP_PORT=9000 docker compose up`.
-
-Секреты (SECRET_KEY и т.п.) в образ не вшиваются — читаются из `.env`
-через pydantic-settings (NFR-1). База данных остаётся вне образа (NFR-2).
+Документы в `docs/` описывают один и тот же проект: при изменении бэклога
+правьте оценки в `03`, приоритеты в `04`, критерии приёмки в `06`.
