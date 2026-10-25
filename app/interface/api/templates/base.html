@@ -16,39 +16,47 @@
     .user-email { color: var(--muted); font-size: .85rem; margin-left: auto; }
     main { max-width: 60rem; margin: 0 auto; padding: 1rem; }
     h1 { font-size: 1.35rem; margin: .25rem 0 1rem; }
+    h2 { font-size: 1.05rem; margin: 1.5rem 0 .6rem; }
     .month-label { color: var(--muted); margin-top: -0.75rem; font-size: .9rem; }
-    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: .6rem;
-      padding: .75rem .9rem; }
-    .card h2 { font-size: .8rem; color: var(--muted); margin: 0 0 .35rem; font-weight: 600; }
+      padding: .8rem .95rem; display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+    .card h2 { font-size: .8rem; color: var(--muted); margin: 0; font-weight: 600; }
     .amount-income { color: #047857; }
     .amount-expense { color: #b91c1c; }
-    .card p { margin: 0; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+    .card p { margin: 0; font-size: 1.15rem; font-variant-numeric: tabular-nums;
+      overflow: hidden; text-overflow: ellipsis; }
     .filters, .meta, .loading, .empty-state { color: var(--muted); font-size: .9rem; }
-    .filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 .5rem; }
-    .filters label { display: flex; flex-direction: column; font-size: .75rem; gap: .2rem; }
-    .filters input, .filters select, .btn { font: inherit; padding: .3rem .5rem;
-      border: 1px solid var(--line); border-radius: .4rem; background: var(--surface); }
-    .btn { cursor: pointer; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem;
+      margin: 1rem 0 .5rem; }
+    .filters label { display: flex; flex-direction: column; gap: .25rem; font-size: .75rem;
+      flex: 1 1 9rem; min-width: 0; }
+    .filters input, .filters select, .btn { font: inherit; font-size: .875rem; color: var(--ink);
+      height: 2.3rem; padding: 0 .55rem; border: 1px solid var(--line);
+      border-radius: .45rem; background: var(--surface); min-width: 0; max-width: 100%; }
+    .filters select { text-overflow: ellipsis; }
+    .btn { cursor: pointer; background: var(--accent); color: #fff; border-color: var(--accent);
+      flex: 0 0 auto; padding: 0 1rem; }
     .btn.link { background: none; border-color: var(--line); color: var(--accent);
-      text-decoration: none; align-self: flex-end; }
-    table { width: 100%; border-collapse: collapse; background: var(--surface);
-      border: 1px solid var(--line); border-radius: .6rem; }
+      text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); }
     th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line);
       font-size: .85rem; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: none; }
     th { color: var(--muted); font-weight: 600; }
     .badge { padding: .1rem .45rem; border-radius: .4rem; font-size: .75rem; }
     .badge.income { background: #d1fae5; color: #065f46; }
     .badge.expense { background: #fee2e2; color: #7f1d1d; }
-    .table-wrap { overflow-x: auto; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: .6rem;
+      background: var(--surface); }
     .empty-state { border: 1px dashed var(--line); border-radius: .6rem;
       padding: 1rem; background: var(--surface); }
     code { background: var(--line); border-radius: .3rem; padding: 0 .3rem; }
-    .category-chart { margin: 1rem 0; }
+    .category-chart { margin: 1.25rem 0; overflow-x: auto; }
     .category-chart__empty { color: var(--muted); background: var(--surface);
       border: 1px dashed var(--line); border-radius: .6rem; padding: 1rem; }
-    .category-chart__table { background: var(--surface); font-size: .85rem;
-      font-variant-numeric: tabular-nums; }
+    .category-chart__table { width: 100%; background: var(--surface); font-size: .85rem;
+      border: 1px solid var(--line); border-radius: .6rem; font-variant-numeric: tabular-nums; }
     .category-chart__caption { font-weight: 600; padding: .5rem .6rem; }
     .category-chart__cell, .category-chart__bar_cell { padding: .45rem .6rem; }
     .category-chart__swatch { display: inline-block; width: .75rem; height: .75rem;
@@ -61,6 +69,9 @@
       .cards { grid-template-columns: 1fr 1fr; }
       main { padding: .75rem; }
       .card { padding: .6rem .75rem; }
+      .filters label { flex: 1 1 100%; }
+      .filters .btn { flex: 1 1 auto; }
+      .category-chart__table { font-size: .8rem; }
     }
     @media (max-width: 375px) { .cards { grid-template-columns: 1fr; } }
   </style>
