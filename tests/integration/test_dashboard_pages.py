@@ -249,3 +249,124 @@ async def test_dashboard_page_requires_authentication(
 
     assert response.status_code == 303
     assert response.headers["location"] == "/login"
+
+
+async def test_dashboard_cookie_auth_valid_cookie(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: валидная cookie даёт доступ к /dashboard."""
+    client = api_client()
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "cookie-valid@test.io", "password": "password123"},
+    )
+    response = await client.post(
+        "/login",
+        data={"email": "cookie-valid@test.io", "password": "password123"},
+    )
+    assert response.status_code == 303
+    assert "access_token" in response.cookies
+
+    # повторный запрос с cookie (httpx хранит cookie в jar)
+    dashboard = await client.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert "user-email" in dashboard.text
+
+
+async def test_dashboard_cookie_auth_bad_cookie(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: невалидная cookie -> редирект на /login."""
+    client = api_client()
+    client.cookies.set("access_token", "garbage-token", domain="test", path="/")
+
+    response = await client.get("/dashboard", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+async def test_dashboard_cookie_auth_bearer_priority(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: Bearer-заголовок имеет приоритет над cookie."""
+    client = api_client()
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "bearer-prio@test.io", "password": "password123"},
+    )
+    token_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "bearer-prio@test.io", "password": "password123"},
+    )
+    token = token_resp.json()["access_token"]
+    client = api_client(token)  # Bearer в заголовках
+    # подложить мусорную cookie
+    client.cookies.set("access_token", "garbage-token", domain="test", path="/")
+
+    response = await client.get("/dashboard", follow_redirects=False)
+
+    assert response.status_code == 200
+
+
+async def test_dashboard_cookie_auth_cookie_rejected_on_api(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: cookie не принимается на JSON API (только Bearer)."""
+    client = api_client()  # без Bearer-заголовка
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "cookie-api@test.io", "password": "password123"},
+    )
+    login = await client.post(
+        "/login",
+        data={"email": "cookie-api@test.io", "password": "password123"},
+    )
+    assert login.status_code == 303
+
+    response = await client.get("/api/v1/auth/me", follow_redirects=False)
+
+    assert response.status_code == 401
+
+
+async def test_login_page_success_sets_cookie_attributes(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: /login успех ставит cookie с HttpOnly/SameSite/Max-Age."""
+    client = api_client()
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "login-attrs@test.io", "password": "password123"},
+    )
+
+    response = await client.post(
+        "/login",
+        data={"email": "login-attrs@test.io", "password": "password123"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie or "samesite=lax" in set_cookie.lower()
+    assert "Max-Age=" in set_cookie
+
+
+async def test_login_page_failure_returns_401(
+    api_client: ApiClientFactory,
+) -> None:
+    """Duo review !40: /login с неверным паролем возвращает 401."""
+    client = api_client()
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "login-fail@test.io", "password": "password123"},
+    )
+
+    response = await client.post(
+        "/login",
+        data={"email": "login-fail@test.io", "password": "wrong-password"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 401
