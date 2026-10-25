@@ -66,10 +66,7 @@ async def get_current_user(
     try:
         yield user
     finally:
-        try:
-            reset_current_user(context_token)
-        except ValueError:
-            pass
+        reset_current_user(context_token)
 
 
 def get_xlsx_report_exporter() -> ReportExporter:
@@ -117,10 +114,7 @@ async def get_current_user_for_pages(
     try:
         yield user
     finally:
-        try:
-            reset_current_user(context_token)
-        except ValueError:
-            pass
+        reset_current_user(context_token)
 
 
 CurrentUser = Annotated[
