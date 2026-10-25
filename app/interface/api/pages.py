@@ -32,12 +32,17 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import model_validator as pydantic_model_validator
+from starlette import status as http_status
 from starlette.responses import Response
 
+from app.core.config import get_settings
+from app.core.errors import AuthenticationFailed
+from app.domains.identity.repository import UserRepository
+from app.domains.identity.service import IdentityService, create_access_token
 from app.domains.ledger.models import Category, Operation
 from app.domains.ledger.repository import OperationRepository
 from app.domains.ledger.schemas import OperationListQuery
@@ -77,6 +82,77 @@ class DashboardFilters(OperationListQuery):
 
 
 router = APIRouter(tags=["Дашборд"])
+
+
+@router.get(
+    "/login",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    summary="Страница входа",
+)
+async def login_page(request: Request) -> HTMLResponse:
+    """Показать форму входа в браузерную сессию."""
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"error": None},
+    )
+
+
+@router.post(
+    "/login",
+    include_in_schema=False,
+    summary="Вход в браузерную сессию",
+)
+async def login_submit(
+    request: Request,
+    session: SessionDep,
+    email: str = Form(...),
+    password: str = Form(...),
+) -> Response:
+    """Проверить учётные данные, выдать cookie и редиректить на дашборд."""
+    service = IdentityService(UserRepository(session))
+    try:
+        user = await service.authenticate(email=email, password=password)
+    except AuthenticationFailed:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Неверный email или пароль"},
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+        )
+
+    token = create_access_token(user.id)
+    settings = get_settings()
+    response = RedirectResponse(
+        url="/dashboard",
+        status_code=http_status.HTTP_303_SEE_OTHER,
+    )
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        max_age=settings.token_ttl * 60,
+        path="/",
+    )
+    return response
+
+
+@router.get(
+    "/logout",
+    include_in_schema=False,
+    summary="Выход из браузерной сессии",
+)
+async def logout() -> Response:
+    """Удалить cookie сессии и вернуться на страницу входа."""
+    response = RedirectResponse(
+        url="/login",
+        status_code=http_status.HTTP_303_SEE_OTHER,
+    )
+    response.delete_cookie(key="access_token", path="/")
+    return response
 
 
 def _money(value: Decimal) -> str:

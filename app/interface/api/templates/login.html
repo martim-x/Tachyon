@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — Tachyon</title>
+  <style>
+    :root { color-scheme: light; --ink: #1f2937; --muted: #6b7280;
+      --accent: #4f46e5; --line: #e5e7eb; --surface: #ffffff; --bg: #f8fafc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--ink); background: var(--bg); display: grid;
+      place-items: center; min-height: 100vh; }
+    .card { background: var(--surface); border: 1px solid var(--line);
+      border-radius: .8rem; padding: 2rem; width: min(22rem, 90vw);
+      box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+    h1 { margin: 0 0 1.25rem; font-size: 1.4rem; }
+    label { display: block; font-size: .85rem; color: var(--muted);
+      margin-bottom: .25rem; }
+    input { width: 100%; padding: .55rem .65rem; border: 1px solid var(--line);
+      border-radius: .4rem; font: inherit; margin-bottom: 1rem; }
+    button { width: 100%; padding: .6rem; border: 0; border-radius: .4rem;
+      background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+    .error { color: #b91c1c; font-size: .85rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <form class="card" method="post" action="/login">
+    <h1>Вход в Tachyon</h1>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="username">
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password">
+    <button type="submit">Войти</button>
+  </form>
+</body>
+</html>

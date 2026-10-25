@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
@@ -42,16 +42,27 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None,
         Depends(bearer_scheme),
     ],
     session: SessionDep,
 ) -> AsyncIterator[User]:
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    # Токен можно передать через заголовок Authorization: Bearer ...
+    # (API-клиенты) либо через cookie access_token (браузерная сессия
+    # на страницах дашборда). Cookie имеет низший приоритет: явный
+    # заголовок всегда выигрывает.
+    token: str | None = None
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    if token is None:
+        token = request.cookies.get("access_token")
+
+    if token is None:
         raise AuthenticationFailed("Отсутствует Bearer-токен")
 
-    user_id = decode_access_token(credentials.credentials)
+    user_id = decode_access_token(token)
     user = await UserRepository(session).get_by_id(user_id)
 
     if user is None:
