@@ -242,11 +242,10 @@ async def test_dashboard_page_filters_operations_by_period_category_and_foreign_
 async def test_dashboard_page_requires_authentication(
     api_client: ApiClientFactory,
 ) -> None:
-    """docs/03 §S2.3: аноним получает 401 в едином error envelope."""
+    """Анонимный браузерный запрос на /dashboard редиректит на /login."""
     client: AsyncClient = api_client()
 
-    response = await client.get("/dashboard")
+    response = await client.get("/dashboard", follow_redirects=False)
 
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"

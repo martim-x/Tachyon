@@ -48,7 +48,7 @@ from app.domains.ledger.repository import OperationRepository
 from app.domains.ledger.schemas import OperationListQuery
 from app.domains.ledger.service import CategoryService, OperationService
 from app.domains.reporting.service import ReportingService
-from app.interface.api.deps import ClockDep, CurrentUserForPages, SessionDep
+from app.interface.api.deps import ClockDep, SessionDep
 from app.interface.api.schemas import error_responses
 from app.interface.dashboard import render_category_chart
 
@@ -225,7 +225,6 @@ def _category_option(category: Category) -> dict[str, str]:
 async def dashboard_page(
     query: Annotated[DashboardFilters, Query()],
     request: Request,
-    current_user: CurrentUserForPages,
     session: SessionDep,
     clock: ClockDep,
 ) -> Response:
@@ -240,6 +239,27 @@ async def dashboard_page(
     запрос получает 401 от зависимости CurrentUser, как у остального API.
     """
 
+    # Браузерная сессия: cookie или Bearer. При отсутствии/невалидном
+    # токене — редирект на /login с очисткой старой cookie.
+    from app.interface.api.deps import get_current_user_for_pages
+
+    try:
+        from fastapi.security import HTTPBearer
+        bearer = HTTPBearer(auto_error=False)
+        creds = await bearer(request)
+        agen = get_current_user_for_pages(request, creds, session)
+        current_user = await agen.__anext__()
+    except Exception:
+        current_user = None
+        agen = None
+    if current_user is None:
+        if agen is not None:
+            await agen.aclose()  # type: ignore[attr-defined]
+        response = RedirectResponse(url="/login", status_code=http_status.HTTP_303_SEE_OTHER)
+        response.delete_cookie(key="access_token", path="/")
+        return response
+
+    # keep user context active for the whole request body
     today = clock.today()
     month_start = date(today.year, today.month, 1)
     month_last = date(
@@ -291,4 +311,8 @@ async def dashboard_page(
         },
     }
 
-    return templates.TemplateResponse(request, "dashboard.html", context)
+    try:
+        return templates.TemplateResponse(request, "dashboard.html", context)
+    finally:
+        if agen is not None:
+            await agen.aclose()  # type: ignore[attr-defined]

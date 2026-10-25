@@ -2098,11 +2098,6 @@
         "summary": "Страница дашборда",
         "description": "HTML-дашборд: сводка текущего месяца и последние операции с фильтрами.\n\nСводка это месячный отчёт за текущий месяц (доходы, расходы, остаток\nи прогноз на месяц, docs/03 §S8.1 T1): один вызов ReportingService.monthly\nпо часам ClockDep. Фильтры последнего блока операций - поля\nDashboardFilters (наследует OperationListQuery, как у GET /api/v1/\noperations); те же даты задают период диаграммы TT-29, поэтому при\nсмене периода компонент рендерится заново (docs/03 §S10.1). Анонимный\nзапрос получает 401 от зависимости CurrentUser, как у остального API.",
         "operationId": "dashboard_page_dashboard_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
         "parameters": [
           {
             "name": "from",
