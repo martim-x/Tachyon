@@ -48,7 +48,7 @@ from app.domains.ledger.repository import OperationRepository
 from app.domains.ledger.schemas import OperationListQuery
 from app.domains.ledger.service import CategoryService, OperationService
 from app.domains.reporting.service import ReportingService
-from app.interface.api.deps import ClockDep, CurrentUser, SessionDep
+from app.interface.api.deps import ClockDep, CurrentUserForPages, SessionDep
 from app.interface.api.schemas import error_responses
 from app.interface.dashboard import render_category_chart
 
@@ -133,7 +133,7 @@ async def login_submit(
         value=token,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=settings.cookie_secure,
         max_age=settings.token_ttl * 60,
         path="/",
     )
@@ -225,7 +225,7 @@ def _category_option(category: Category) -> dict[str, str]:
 async def dashboard_page(
     query: Annotated[DashboardFilters, Query()],
     request: Request,
-    current_user: CurrentUser,
+    current_user: CurrentUserForPages,
     session: SessionDep,
     clock: ClockDep,
 ) -> Response:

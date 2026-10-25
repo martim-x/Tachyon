@@ -42,27 +42,20 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None,
         Depends(bearer_scheme),
     ],
     session: SessionDep,
 ) -> AsyncIterator[User]:
-    # Токен можно передать через заголовок Authorization: Bearer ...
-    # (API-клиенты) либо через cookie access_token (браузерная сессия
-    # на страницах дашборда). Cookie имеет низший приоритет: явный
-    # заголовок всегда выигрывает.
-    token: str | None = None
-    if credentials is not None and credentials.scheme.lower() == "bearer":
-        token = credentials.credentials
-    if token is None:
-        token = request.cookies.get("access_token")
-
-    if token is None:
+    # API-эндпоинты принимают только Bearer-токен из заголовка
+    # Authorization. Cookie-сессия используется только для HTML-страниц
+    # дашборда (см. get_current_user_for_pages) — это исключает CSRF
+    # на state-changing маршрутах JSON API.
+    if credentials is None or credentials.scheme.lower() != "bearer":
         raise AuthenticationFailed("Отсутствует Bearer-токен")
 
-    user_id = decode_access_token(token)
+    user_id = decode_access_token(credentials.credentials)
     user = await UserRepository(session).get_by_id(user_id)
 
     if user is None:
@@ -91,7 +84,45 @@ ExportDep = Annotated[
     Depends(get_xlsx_report_exporter, scope="function"),
 ]
 
+async def get_current_user_for_pages(
+    request: Request,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(bearer_scheme),
+    ],
+    session: SessionDep,
+) -> AsyncIterator[User]:
+    # HTML-страницы дашборда: cookie access_token (браузер) либо Bearer
+    # (Swagger/тесты). Заголовок имеет приоритет над cookie.
+    token: str | None = None
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    if token is None:
+        token = request.cookies.get("access_token")
+
+    if token is None:
+        raise AuthenticationFailed("Отсутствует Bearer-токен")
+
+    user_id = decode_access_token(token)
+    user = await UserRepository(session).get_by_id(user_id)
+
+    if user is None:
+        raise AuthenticationFailed("Пользователь токена не найден")
+
+    context_token = set_current_user(user.id)
+
+    try:
+        yield user
+    finally:
+        reset_current_user(context_token)
+
+
 CurrentUser = Annotated[
     User,
     Depends(get_current_user, scope="function"),
+]
+
+CurrentUserForPages = Annotated[
+    User,
+    Depends(get_current_user_for_pages, scope="function"),
 ]
